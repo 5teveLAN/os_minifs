@@ -4,8 +4,7 @@
 #include <stdbool.h>
 #include "minifs_ops.h"
 
-#define FCB_SIZE 32
-
+int FCB_SIZE = 32;
 int block_count;
 int block_size;
 int bmap_addr;
@@ -128,53 +127,6 @@ uint32_t mkBitmap_Disk(){
     return EXIT_SUCCESS;
 }
 
-uint32_t mkFCB(){
-
-    FILE *fp = fopen(FILE_NAME, "r+b");
-    uint32_t fcb_current_number = fsread(0,20);
-
-    // 1. write id_number
-    // move to new FCB
-    fseek(fp, 2048+fcb_current_number*FCB_SIZE, SEEK_SET);
-    printf("Create FCB%d at %ld\n",fcb_current_number, ftell(fp));
-    //from MSB to LSB
-    for (int offset = 24; offset >= 0; offset-=8){
-
-        fputc((fcb_current_number>>offset) & 0xFF, fp);
-    }
-
-
-    // 2. file_size
-    // keep it zero, skip by 4 bytes
-    fseek(fp, 4, SEEK_CUR);
-
-    // 3. dbp_1,2,3,4
-    // search for free dbp
-    uint32_t dbp = 0;
-    for (int i = 10; i < block_count; ++i){
-        if (!bitmap[i]){
-            dbp=i;
-            break;
-        }
-    }
-
-    if (!dbp){
-        perror("no free blocks");
-        return EXIT_FAILURE;
-    }
-    // write dbp_1,2,3,4
-    for (uint32_t i = 0; i < 4;++i, dbp++){
-        printf("Create DBP%d at %ld, it points to block %d\n",i, ftell(fp),dbp);
-        //from MSB to LSB
-        for (int offset = 24; offset >= 0; offset-=8){
-            fputc((dbp>>offset) & 0xFF, fp);
-        }
-        bitmap[dbp]=true;
-    } 
-    fswrite(0,20,fcb_current_number+1);
-    return fcb_current_number;
-  
-}
 uint32_t mkdir(){
 
     fflush(NULL);   
@@ -236,19 +188,6 @@ uint32_t mkdir(){
     return EXIT_SUCCESS;
 }
 
-uint32_t touch(char* file_name){
-    uint32_t inode_id = mkFCB();
-    char c = file_name[0];
-    int offset = 0;
-    for (;fsread(10,offset)!=0;offset+=64);
-    fswrite(10,offset,inode_id);
-    for (int i = 0; c!='\0'; ++i){
-        c = file_name[i];
-        fswritec(10,offset+4+i,c);
-    }
-    
-
-}
 void mkfs(int file_size){
     mkImg(file_size);
     mkVCB_RAM();

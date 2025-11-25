@@ -3,7 +3,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+extern int block_count;
+extern int FCB_SIZE;
+extern int block_size;
+extern int bmap_addr;
+extern int fcb_start_addr;
+extern int fcb_max_count;
+extern int fcb_current_number;
 extern char* FILE_NAME;
+extern bool bitmap[100];
+
 uint32_t fsread(uint32_t block, uint32_t offset){
     FILE *fp = fopen(FILE_NAME, "r+b");
     uint32_t block_size = 0;
@@ -15,6 +24,18 @@ uint32_t fsread(uint32_t block, uint32_t offset){
     for (int boffset = 24; boffset >= 0; boffset-=8){
         data |= (uint32_t)fgetc(fp)<<boffset;//BUG IS HERE
     }
+    fclose(fp);
+    return data;
+}
+uint32_t fsreadc(uint32_t block, uint32_t offset){
+    FILE *fp = fopen(FILE_NAME, "r+b");
+    uint32_t block_size = 0;
+    uint32_t data = 0x00;
+    if (block!=0)
+        block_size = fsread(0, 4); 
+
+    fseek(fp, block*block_size+offset, SEEK_SET);
+    data = fgetc(fp);
     fclose(fp);
     return data;
 }
@@ -41,3 +62,63 @@ uint32_t fswritec(uint32_t block, uint32_t offset, char data){
     fputc(data, fp);
     fclose(fp);
 }
+uint32_t loadVCB(){
+    block_count = fsread(0,0);
+    block_size = fsread(0,4);
+    bmap_addr = fsread(0,8);
+    fcb_start_addr = fsread(0,12);
+    fcb_max_count = fsread(0,16);
+    fcb_current_number = fsread(0,20);
+}
+uint32_t loadBitmap(){
+    for (uint32_t i = 0; i < block_count; ++i){
+        bitmap[i] = fsreadc(1,i);
+    }
+}
+uint32_t mkFCB(){
+    FILE *fp = fopen(FILE_NAME, "r+b");
+    uint32_t fcb_current_number = fsread(0,20);
+
+    // 1. write id_number
+    // move to new FCB
+    fseek(fp, 2048+fcb_current_number*FCB_SIZE, SEEK_SET);
+    printf("Create FCB%d at %ld\n",fcb_current_number, ftell(fp));
+    //from MSB to LSB
+    for (int offset = 24; offset >= 0; offset-=8){
+
+        fputc((fcb_current_number>>offset) & 0xFF, fp);
+    }
+
+
+    // 2. file_size
+    // keep it zero, skip by 4 bytes
+    fseek(fp, 4, SEEK_CUR);
+
+    // 3. dbp_1,2,3,4
+    // search for free dbp
+    uint32_t dbp = 0;
+    for (int i = 10; i < block_count; ++i){
+        if (!bitmap[i]){
+            dbp=i;
+            break;
+        }
+    }
+
+    if (!dbp){
+        perror("no free blocks");
+        return EXIT_FAILURE;
+    }
+    // write dbp_1,2,3,4
+    for (uint32_t i = 0; i < 4;++i, dbp++){
+        printf("Create DBP%d at %ld, it points to block %d\n",i, ftell(fp),dbp);
+        //from MSB to LSB
+        for (int offset = 24; offset >= 0; offset-=8){
+            fputc((dbp>>offset) & 0xFF, fp);
+        }
+        bitmap[dbp]=true;
+    } 
+    fswrite(0,20,fcb_current_number+1);
+    return fcb_current_number;
+  
+}
+
