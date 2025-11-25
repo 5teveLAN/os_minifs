@@ -25,7 +25,7 @@ uint32_t fsread(uint32_t block, uint32_t offset){
     for (int boffset = 24; boffset >= 0; boffset-=8){
         data |= (uint32_t)fgetc(fp)<<boffset;//BUG IS HERE
     }
-    printf("\n%d\n",data);
+    fclose(fp);
     return data;
 }
 uint32_t fswrite(uint32_t block, uint32_t offset, uint32_t data){
@@ -38,6 +38,7 @@ uint32_t fswrite(uint32_t block, uint32_t offset, uint32_t data){
     for (int boffset = 24; boffset >= 0; boffset-=8){
         fputc((data>>boffset) & 0xFF, fp);
     }
+    fclose(fp);
 }
 
 uint32_t fswritec(uint32_t block, uint32_t offset, char data){
@@ -48,6 +49,7 @@ uint32_t fswritec(uint32_t block, uint32_t offset, char data){
 
     fseek(fp, block*block_size+offset, SEEK_SET);
     fputc(data, fp);
+    fclose(fp);
 }
 
 int mkImg(int total_bytes){
@@ -273,10 +275,12 @@ uint32_t mkdir(){
 uint32_t touch(char* file_name){
     uint32_t inode_id = mkFCB();
     char c = file_name[0];
-    fswrite(10,0,inode_id);
+    int offset = 0;
+    for (;fsread(10,offset)!=0;offset+=64);
+    fswrite(10,offset,inode_id);
     for (int i = 0; c!='\0'; ++i){
         c = file_name[i];
-        fswritec(10,4+i,c);
+        fswritec(10,offset+4+i,c);
     }
     
 
@@ -302,20 +306,10 @@ int main(int argc, char* argv[]){
         return EXIT_FAILURE;
     }
     mkfs(file_size);
-    printf("block_count:%d\n",fsread(0,0));
-    printf("block_size:%d\n",fsread(0,4));
-    int fcb_current_count = fsread(0,20);
-    printf("fcb_current_count:%d\n",fcb_current_count);
+    printf("Block size: %d\n", fsread(0,4));
+
     touch("test");
-    fcb_current_count = fsread(0,20);
-    printf("fcb_current_count:%d\n",fcb_current_count);
-    touch("test2");
-    touch("test2");
-    fcb_current_count = fsread(0,20);
-    printf("fcb_current_count:%d\n",fcb_current_count);
-    printf("fcb_current_count:%d\n",fsread(0,20));
-    printf("block_count:%d\n",fsread(0,0));
-    printf("block_size:%d\n",fsread(0,4));
+    touch("test");
     
 
 }
