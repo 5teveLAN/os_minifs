@@ -30,6 +30,8 @@ uint32_t touch(char* file_name){
 
 int main(int argc, char* argv[]){
     char input_line[256];
+    char *command;
+    char *argument;
     if (argc!=2){
         fprintf(stderr, "Usage: %s <FILE_NAME>.", argv[0]);
         return EXIT_FAILURE;
@@ -47,7 +49,22 @@ int main(int argc, char* argv[]){
             // Handle EOF (e.g., Ctrl+D)
             break;
         }
+        input_line[strcspn(input_line, "\n")] = 0;
         if (input_line[0]=='\0')
             continue;
+        command = strtok(input_line, " ");
+        // continue split previous string
+        argument = strtok(NULL, " "); 
+
+        if (strcmp("touch", command) == 0){
+            if (argument== NULL){
+                printf("usage: touch <file_name>\n");
+                continue;
+            } 
+            touch(argument);
+        }
+        else if (strcmp("exit", command) == 0){
+            break;
+        }
     }
 }
