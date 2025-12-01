@@ -211,8 +211,6 @@ int main(int argc, char* argv[]){
     mkfs(file_size);
     printf("Block size: %d\n", fsread(0,4));
 
-    touch("test");
-    touch("test");
     
 
 }
