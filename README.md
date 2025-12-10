@@ -1,6 +1,6 @@
 ### Compile
 1. Compile the header file 
-    `gcc -c minifs_ops.c -o minifs_ops.h`
+    `gcc -c minifs_ops.c -o minifs_ops.o`
 2. Compile mkfs 
    `gcc mkfs.c minifs_ops.o -o mkfs`
 3. Compile shell
@@ -31,3 +31,7 @@ max_file name: 60 char
 | Offset 32 |                |                   | (another FCB)<br>id |                |                    |
 | Offset 64 |                |                   |                     |                | (another inode id) |
 We want to read/write the fcb_current_addr, just call `fsread(0,16)` (block0,offset16)
+
+
+
+
