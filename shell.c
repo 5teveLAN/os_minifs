@@ -16,47 +16,17 @@ int fcb_current_number;
 char* FILE_NAME;
 bool bitmap[100];
 uint32_t touch(char* file_name){
+
     // 檢查目錄中是否已存在文件
-    int offset = 0;
-    while (offset < block_size) {
-        uint32_t existing_inode = fsread(10, offset);
-        
-        // if inode == 0 then no file
-        if (existing_inode == 0) {
-            break;
-        }
-        
-        // 讀取現有文件名
-        char existing_name[64] = {0};
-        int name_match = 1;
-        for (int i = 0; i < 63; i++) {
-            existing_name[i] = (char)fsreadc(10, offset + 4 + i);
-            if (existing_name[i] == '\0') {
-                break;
-            }
-        }
-        
-        // 比較文件名
-        int i = 0;
-        while (file_name[i] != '\0' || existing_name[i] != '\0') {
-                // printf("check inode %d:existing:%c, creating:%c\n",existing_inode, existing_name[i], file_name[i]);
-            if (file_name[i] != existing_name[i]) {
-                name_match = 0;
-                break;
-            }
-            i++;
-        }
-        
-        // If both names ended and matched
-        if (name_match) {
-            printf("File '%s' already exists (inode: %u)\n", file_name, existing_inode);
-            return existing_inode;
-        }
-        
-        offset += 64;
+    uint32_t existing_inode = filefind(file_name);
+    if (existing_inode){
+        printf("File '%s' already exists (inode: %u)\n", file_name, existing_inode);
+
+        return EXIT_FAILURE;
     }
 
     uint32_t inode_id = mkFCB();
+    uint32_t offset = (inode_id-1) * 64;
 
     fswrite(10, offset, inode_id);
     for (int i = 0; file_name[i] != '\0' && i < 63; ++i) {
@@ -102,6 +72,9 @@ int main(int argc, char* argv[]){
                 continue;
             } 
             touch(argument);
+        }
+        else if (strcmp("exit", command) == 0){
+            break;
         }
         else if (strcmp("exit", command) == 0){
             break;

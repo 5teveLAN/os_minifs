@@ -39,7 +39,7 @@ uint32_t fsreadc(uint32_t block, uint32_t offset){
     fclose(fp);
     return data;
 }
-uint32_t fswrite(uint32_t block, uint32_t offset, uint32_t data){
+void fswrite(uint32_t block, uint32_t offset, uint32_t data){
     FILE *fp = fopen(FILE_NAME, "r+b");
     uint32_t block_size = 0;
     if (block!=0)
@@ -52,7 +52,7 @@ uint32_t fswrite(uint32_t block, uint32_t offset, uint32_t data){
     fclose(fp);
 }
 
-uint32_t fswritec(uint32_t block, uint32_t offset, char data){
+void fswritec(uint32_t block, uint32_t offset, char data){
     FILE *fp = fopen(FILE_NAME, "r+b");
     uint32_t block_size = 0;
     if (block!=0)
@@ -62,7 +62,7 @@ uint32_t fswritec(uint32_t block, uint32_t offset, char data){
     fputc(data, fp);
     fclose(fp);
 }
-uint32_t loadVCB(){
+void loadVCB(){
     block_count = fsread(0,0);
     block_size = fsread(0,4);
     bmap_addr = fsread(0,8);
@@ -70,7 +70,7 @@ uint32_t loadVCB(){
     fcb_max_count = fsread(0,16);
     fcb_current_number = fsread(0,20);
 }
-uint32_t loadBitmap(){
+void loadBitmap(){
     for (uint32_t i = 0; i < block_count; ++i){
         bitmap[i] = fsreadc(1,i);
     }
@@ -122,3 +122,43 @@ uint32_t mkFCB(){
   
 }
 
+uint32_t filefind(char *file_name){
+    int offset = 0;
+    while (offset < block_size) {
+        uint32_t existing_inode = fsread(10, offset);
+        
+        // if inode == 0 then no file
+        if (existing_inode == 0) {
+            break;
+        }
+        
+        // 讀取現有文件名
+        char existing_name[64] = {0};
+        int name_match = 1;
+        for (int i = 0; i < 63; i++) {
+            existing_name[i] = (char)fsreadc(10, offset + 4 + i);
+            if (existing_name[i] == '\0') {
+                break;
+            }
+        }
+        
+        // 比較文件名
+        int i = 0;
+        while (file_name[i] != '\0' || existing_name[i] != '\0') {
+                //printf("check inode %d:existing:%c, creating:%c\n",existing_inode, existing_name[i], file_name[i]);
+            if (file_name[i] != existing_name[i]) {
+                name_match = 0;
+                break;
+            }
+            i++;
+        }
+        
+        // If both names ended and matched
+        if (name_match) {
+            return existing_inode;
+        }
+        
+        offset += 64;
+    }
+    return 0;
+}
