@@ -38,7 +38,8 @@ uint32_t touch(char* file_name){
         
         // 比較文件名
         int i = 0;
-        while (file_name[i] != '\0' && existing_name[i] != '\0') {
+        while (file_name[i] != '\0' || existing_name[i] != '\0') {
+                printf("check inode %d:existing:%c, creating:%c\n",existing_inode, existing_name[i], file_name[i]);
             if (file_name[i] != existing_name[i]) {
                 name_match = 0;
                 break;
