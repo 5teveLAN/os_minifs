@@ -45,7 +45,7 @@ Take an example:
 | **4 direct block pointer** | Block n1,n2,n3,n4           |
 
 
-![[Pasted image 20251113140801.png]]
+![[Pasted image 20251211233454.png]]
 #### 4. File and Directory
 In UNIX, a directory is treads as a special type of file, both of they have their own inode.
 
@@ -55,11 +55,11 @@ In UNIX, a directory is treads as a special type of file, both of they have thei
 - Directory Structure 
 	- Dentry: Records file name and number of inode.
 	- Tree-Structured Directory
-	![[Pasted image 20251113133322.png]]
+	![[Pasted image 20251211233507.png]]
 
 #### 5. Bitmap
 Stores the usage of blocks.
-![[Pasted image 20251113140348.png]]
+
 #### Summary: Disk Layout
 
 | Block(s)           | Type                            | Rationale                                                                              |
@@ -69,7 +69,10 @@ Stores the usage of blocks.
 | **Block 2 to 9**   | **FCB / Inode Table**           | **One block stores MANY FCBs.** (e.g., 8 blocks $\times$ 3 FCBs/block = 24 files max). |
 | **Block 10 to 99** | Data Blocks                     | Stores the file and directory contents. (90/4=22 files)                                |
 
-![[Pasted image 20251113140618.png]]
+![[Pasted image 20251211233358.png]]
+
+Another structure design:
+![[Pasted image 20251211234317.png]]
 
 ### File Operation in File System
 #### Disk Utility
@@ -83,7 +86,7 @@ In our project, we use `mkfs` to:
 In every OS, we can create and access file via shell.
 In this case, we use a C program to emulate a shell. Just use system API.
 
-![[Pasted image 20251113141445.png]]
+![[Pasted image 20251211233538.png]]
 
 ### mkfs
 ### touch
