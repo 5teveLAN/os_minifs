@@ -11,7 +11,7 @@
 
 extern const char* FILE_NAME;
 extern uint8_t *bmap, *fmap;
-VCB vcb;
+extern VCB vcb;
 
 // We want to write the dentry to its directory!
 // its directory = 
@@ -70,11 +70,9 @@ uint32_t fmap_new(){
         }
     
     if (!id){
-        printf("No more free fcb!\n");
         return 0;
     }
     else {
-        printf("Create new fcb: %d\n", id);
         fmap[id]=1;
         return id;
     }

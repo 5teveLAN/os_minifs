@@ -8,7 +8,7 @@
 const char* FILE_NAME;
 uint32_t FILE_SIZE;
 uint8_t *bmap, *fmap;
-extern VCB vcb;
+VCB vcb;
 
 // just write '\0' at total_bytes to the file
 int mk_img(){

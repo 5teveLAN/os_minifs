@@ -5,35 +5,60 @@
 #include <string.h>
 #include "minifs_ops.h"
 
-int FCB_SIZE;
-int BLOCK_COUNT;
-int BLOCK_SIZE;
-int BMAP_ADDR;
-int FCB_START_ADDR;
-int FCB_MAX_COUNT;
-int FCB_CURRENT_NUMBER;
-char* FILE_NAME;
-bool bitmap[100];
+VCB vcb;
+const char* FILE_NAME;
 uint32_t current_dir_id;
+uint8_t *bmap, *fmap;
 
 uint32_t ls(){
 
 }
 
-uint32_t mkdir(char* file_name){
-    FCB fcb;
+void mkdir(char* file_name){
+    // check if file name (not include '\0') > 59 
+    if (strlen(file_name)>59){
+        printf("exceeds the max len of file name: 60!\n");
+        return;
+    }
+    // check if name exists
+    if (find_file(current_dir_id, file_name)){
+        printf("file %s already exists!\n", file_name);
+        return;
+    }
 
-    Dentry current_dir;
-    Dentry parent_dir;
+    // check fcb remains
+    uint32_t new_dir_id = fmap_new();
+    if (!new_dir_id){
+        printf("No more free fcb!\n");
+        return;
+    }
 
+    // change is_dir in its fcb
+    FCB fcb = fs_read_fcb(new_dir_id);
+    fcb.is_dir = 1;
+    fs_write_fcb(new_dir_id, &fcb);
+
+    printf("Create new fcb: %d\n", new_dir_id);
+    printf("dbp[0] at block %d\n", fcb.dbp[0]);
+
+    // add a dentry on current dir
+
+    Dentry new_dentry; 
+    new_dentry.file_id   = new_dir_id;
+    strncpy(new_dentry.file_name, file_name, 60);
+
+    fs_write_dentry(current_dir_id, &new_dentry);
+
+    // add ".." and "." to the new dir 
+    Dentry itself = {new_dir_id, "."}; 
+    fs_write_dentry(new_dir_id, &itself);
     
-
-    // find the target directory 
-
-
-    // add a dentry on it
+    Dentry parent_dentry = {current_dir_id, ".."}; 
+    fs_write_dentry(new_dir_id, &parent_dentry);
+    
+    return;
 }
-
+/*
 uint32_t touch(char* file_name){
 
     // 檢查目錄中是否已存在文件
@@ -90,6 +115,7 @@ uint32_t append(char* file_name, char* S){
     return EXIT_SUCCESS;
 
 }
+*/
     
 
 
@@ -98,13 +124,18 @@ int main(int argc, char* argv[]){
     char input_line[256];
     char *command;
     char *argument;
+    // check input
     if (argc!=2){
         fprintf(stderr, "Usage: %s <FILE_NAME>.", argv[0]);
         return EXIT_FAILURE;
     }
+
     FILE_NAME = argv[1]; 
-    loadVCB();
-    loadBitmap();
+    vcb_load();
+    bmap = (uint8_t *)calloc(vcb.block_count, sizeof(uint8_t));
+    fmap = (uint8_t *)calloc(vcb.fcb_count, sizeof(uint8_t));
+    bmap_load();
+    fmap_load();
 
 
     while (1) {
@@ -122,16 +153,17 @@ int main(int argc, char* argv[]){
         // continue split previous string
         argument = strtok(NULL, " "); 
 
-        if (strcmp("touch", command) == 0){
+        if (strcmp("mkdir", command) == 0){
             if (argument== NULL){
-                printf("usage: touch <file_name>\n");
+                printf("usage: mkdir <file_name>\n");
                 continue;
             } 
-            touch(argument);
+            mkdir(argument);
         }
         else if (strcmp("exit", command) == 0){
             break;
         }
+        /*
         else if (strcmp("append", command) == 0){
             char* content = strtok(NULL, " "); 
             if (argument== NULL || content==NULL){
@@ -143,5 +175,8 @@ int main(int argc, char* argv[]){
         else if (strcmp("fcb_number", command) == 0){
             printf("FCB_CURRENT_NUMBER:%d\n",FCB_CURRENT_NUMBER);
         }
+        */
     }
+    free(bmap);
+    free(fmap);
 }
