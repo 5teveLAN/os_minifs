@@ -11,14 +11,12 @@
             "id": "974f622ee052ab79",
             "type": "leaf",
             "state": {
-              "type": "markdown",
+              "type": "image",
               "state": {
-                "file": "res/minifs_ops.md",
-                "mode": "source",
-                "source": false
+                "file": "res/Pasted image 20251211233358.png"
               },
-              "icon": "lucide-file",
-              "title": "minifs_ops"
+              "icon": "lucide-image",
+              "title": "Pasted image 20251211233358"
             }
           }
         ]
@@ -184,8 +182,9 @@
       "obsidian-excalidraw-plugin:New drawing": false
     }
   },
-  "active": "974f622ee052ab79",
+  "active": "6f3c11c348544727",
   "lastOpenFiles": [
+    "res/minifs_ops.md",
     "mkfs.c~",
     "minifs_ops.c~",
     "minifs_ops.h~",
@@ -193,16 +192,15 @@
     "4913",
     "mkfs",
     "shell.c~",
-    "Pasted image 20251220203938.png",
-    "res/minifs_ops.md",
+    "res/Pasted image 20251220203938.png",
     "res/MiniFS Introduction.pdf",
     "res/Pasted image 20251111225936.png",
     "res/Pasted Image 20251111225752_439.png",
-    "Pasted image 20251211233358.png",
-    "Pasted image 20251211233454.png",
-    "Pasted image 20251211233507.png",
-    "Pasted image 20251211233538.png",
-    "Pasted image 20251211234317.png",
+    "res/Pasted image 20251211233358.png",
+    "res/Pasted image 20251211233454.png",
+    "res/Pasted image 20251211233507.png",
+    "res/Pasted image 20251211233538.png",
+    "res/Pasted image 20251211234317.png",
     "res/資工三甲 期末專題規格說明.pdf",
     "res/Pasted image 20251111225953.png",
     "shell.h~",
