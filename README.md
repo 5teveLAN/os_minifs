@@ -14,12 +14,6 @@
     `xxd -c 16 -g 4 -s 10240 disk.img | less`
 
 ### FS Structure
-Block: 1024 Byte (Can be extended to 2k,4k)
-entry size: 4 Byte
-max file name: 60 char
-max file size: 4 * block_size (4K,8K,16K)
-max file count: half of block_size (512,1K, 2K)
-max block count: half of block_size (512,1K, 2K)
 
 |              | Block 0<br>VCB   | Block 1<br>Bitmap | Block 2<br>FCB      | Block 3<br>... | Block 10<br>root   |     |
 | ------------ | ---------------- | ----------------- | ------------------- | -------------- | ------------------ | --- |
