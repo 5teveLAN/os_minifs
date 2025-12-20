@@ -29,7 +29,6 @@
 | Offset<br>36 | fcb_count        |                   |                     |                |                    |     |
 | Offset 64    |                  |                   |                     |                | (another inode id) |     |
 
-We want to read/write the fcb_current_addr, just call `fsread(0,16)` (block0,offset16)
 
 
 
