@@ -11,12 +11,14 @@
             "id": "974f622ee052ab79",
             "type": "leaf",
             "state": {
-              "type": "image",
+              "type": "markdown",
               "state": {
-                "file": "res/Pasted image 20251211233358.png"
+                "file": "res/minifs_ops.md",
+                "mode": "source",
+                "source": false
               },
-              "icon": "lucide-image",
-              "title": "Pasted image 20251211233358"
+              "icon": "lucide-file",
+              "title": "minifs_ops"
             }
           }
         ]
@@ -182,21 +184,22 @@
       "obsidian-excalidraw-plugin:New drawing": false
     }
   },
-  "active": "6f3c11c348544727",
+  "active": "974f622ee052ab79",
   "lastOpenFiles": [
+    "res/MiniFS Introduction.md",
+    "res/MiniFS Introduction.pdf",
+    "README.md",
+    "res/Pasted image 20251211233358.png",
     "res/minifs_ops.md",
     "mkfs.c~",
     "minifs_ops.c~",
     "minifs_ops.h~",
-    "res/MiniFS Introduction.md",
     "4913",
     "mkfs",
     "shell.c~",
     "res/Pasted image 20251220203938.png",
-    "res/MiniFS Introduction.pdf",
     "res/Pasted image 20251111225936.png",
     "res/Pasted Image 20251111225752_439.png",
-    "res/Pasted image 20251211233358.png",
     "res/Pasted image 20251211233454.png",
     "res/Pasted image 20251211233507.png",
     "res/Pasted image 20251211233538.png",
@@ -205,7 +208,6 @@
     "res/Pasted image 20251111225953.png",
     "shell.h~",
     "shell.h",
-    "README.md",
     "readme.md",
     "res/Drawing 2025-11-11 22.50.36.excalidraw.md",
     "res/預計進度安排.md"

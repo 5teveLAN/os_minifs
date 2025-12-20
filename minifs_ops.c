@@ -15,6 +15,15 @@ VCB vcb;
 
 // We want to write the dentry to its directory!
 // its directory = 
+
+bool find_file(uint32_t dir_id, char* file_name){
+    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
+        Dentry query_dir = fs_read_dentry(dir_id, index);
+        if (strcmp(query_dir.file_name, file_name)==0) //no difference
+            return true;
+    }
+    return false;
+}
 void fs_write_dentry(uint32_t dir_id,Dentry *new_dentry){
     uint32_t dir_dbp0 = fs_read_fcb(dir_id).dbp[0];
     Dentry temp_dentry = *new_dentry; //copy struct
@@ -41,6 +50,7 @@ void fs_write_dentry(uint32_t dir_id,Dentry *new_dentry){
     return;
 
 }
+
 Dentry fs_read_dentry(uint32_t dir_id, uint32_t index){
     FILE *fp = fopen(FILE_NAME, "r+b");
     uint32_t dir_dbp0 = fs_read_fcb(dir_id).dbp[0];
@@ -242,45 +252,4 @@ void debug_dump(){
         printf("fcb%d.dbp[%d]=%d\n", id, i,fcb.dbp[i]);
     }
 
-}
-uint32_t file_find(char *file_name){
-
-    int offset = 0;
-    while (offset < vcb.block_size) {
-        uint32_t existing_inode = fs_read_uint32(10, offset);
-        
-        // if inode == 0 then no file
-        if (existing_inode == 0) {
-            break;
-        }
-        
-        // 讀取現有文件名
-        char existing_name[64] = {0};
-        int name_match = 1;
-        for (int i = 0; i < 63; i++) {
-            existing_name[i] = (char)fs_read_char(10, offset + 4 + i);
-            if (existing_name[i] == '\0') {
-                break;
-            }
-        }
-        
-        // 比較文件名
-        int i = 0;
-        while (file_name[i] != '\0' || existing_name[i] != '\0') {
-                //printf("check inode %d:existing:%c, creating:%c\n",existing_inode, existing_name[i], file_name[i]);
-            if (file_name[i] != existing_name[i]) {
-                name_match = 0;
-                break;
-            }
-            i++;
-        }
-        
-        // If both names ended and matched
-        if (name_match) {
-            return existing_inode;
-        }
-        
-        offset += 64;
-    }
-    return 0;
 }

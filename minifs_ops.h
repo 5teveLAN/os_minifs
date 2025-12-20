@@ -64,5 +64,5 @@ void fmap_save();
 
 void debug_dump();
 
-uint32_t filefind(char *file_name);
+bool find_file(uint32_t dir_id, char* file_name);
 #endif
