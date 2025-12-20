@@ -24,14 +24,21 @@ Take an example:
 #### 2. VCB
 - a VCB contains infomation of the volume, such as:
 
-| Field                       | Value/Description (Example)                      |
-| --------------------------- | ------------------------------------------------ |
-| **Total Block Count**       | 100                                              |
-| **Block Size**              | 1 KB (1024 bytes)                                |
-| **Free Block Map Location** | Block 1 (Pointer to the Free Space Bitmap)       |
-| **FCB Table Start Address** | Block 2                                          |
-| **Max FCB Count**           | The maximum number of files that can be created. |
-| **Free FCB Count**          | Current number of available FCBs.                |
+| Field                                                                                                                                                                                                                                                                                      | Value/Description (Example) |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
+| BLOCK_COUNT                                                                                                                                                                                                                                                                                | 100                         |
+| BLOCK_SIZE                                                                                                                                                                                                                                                                                 | 1 KB (1024 bytes)           |
+| FCB_SIZE                                                                                                                                                                                                                                                                                   | 32                          |
+| BMAP_START_BLOCK                                                                                                                                                                                                                                                                           | 1                           |
+| BMAP_END_BLOCK                                                                                                                                                                                                                                                                             | 1                           |
+| FMAP_START_BLOCK                                                                                                                                                                                                                                                                           | 2                           |
+| FMAP_END_BLOCK                                                                                                                                                                                                                                                                             | 2                           |
+| FCB_START_BLOCK                                                                                                                                                                                                                                                                            | 3                           |
+| FCB_END_BLOCK                                                                                                                                                                                                                                                                              | 3                           |
+| DATA_START_BLOCK                                                                                                                                                                                                                                                                           | 10                          |
+| DATA_END_BLOCK                                                                                                                                                                                                                                                                             | 99                          |
+| FCB_COUNT                                                                                                                                                                                                                                                                                  | 224                         |
+
 
 - It is called superblock in UFS, while master file table in NTFS.
 
@@ -55,24 +62,28 @@ In UNIX, a directory is treads as a special type of file, both of they have thei
 - Directory Structure 
 	- Dentry: Records file name and number of inode.
 	- Tree-Structured Directory
-	![[Pasted image 20251211233507.png]]
+	- ![[Pasted image 20251220203938.png]]
+	- Every directory has the dentries:
+		- **Itself**: "."
+		- **Parent Directory**: "..", except root directory.
+	
 
-#### 5. Bitmap
+#### 5. Bitmap & FCBmap
 Stores the usage of blocks.
-
+![[Pasted image 20251211233507.png]]
 #### Summary: Disk Layout
+To implement a simple file system, we use the fix variables:
 
-| Block(s)           | Type                            | Rationale                                                                              |
-| ------------------ | ------------------------------- | -------------------------------------------------------------------------------------- |
-| **Block 0**        | Superblock (VCB)                | Volume-wide metadata.                                                                  |
-| **Block 1**        | Free Space Bitmap<br>Free inode | Tracks usage of the 100 blocks.<br>Tracks usage of the 100 inodes.                     |
-| **Block 2 to 9**   | **FCB / Inode Table**           | **One block stores MANY FCBs.** (e.g., 8 blocks $\times$ 3 FCBs/block = 24 files max). |
-| **Block 10 to 99** | Data Blocks                     | Stores the file and directory contents. (90/4=22 files)                                |
+
+| Block(s)           | Type                  | Rationale                                               |
+| ------------------ | --------------------- | ------------------------------------------------------- |
+| **Block 0**        | Superblock (VCB)      | Volume-wide metadata.                                   |
+| **Block 1**        | Free block<br>        | Tracks usage of the 100 blocks.<br>                     |
+| **Block 2**        | Free inode            | Tracks usage of the 100 inodes.                         |
+| **Block 3 to 9**   | **FCB / Inode Table** | **One block stores MANY FCBs.**                         |
+| **Block 10 to 99** | Data Blocks           | Stores the file and directory contents. (90/4=22 files) |
 
 ![[Pasted image 20251211233358.png]]
-
-Another structure design:
-![[Pasted image 20251211234317.png]]
 
 ### File Operation in File System
 #### Disk Utility
@@ -123,6 +134,6 @@ In this case, we use a C program to emulate a shell. Just use system API.
 | rmdir()       |     |     |     |     |        |             |
 3. 整合成 shell，設計測試流程，繳交程式與說明文件
 
-| Items          | 黃婧絜    | 鄒昱宸    | 蕭宏均 | 陳裕勛 | 李冠緯 | Description                                                                                                                                                   |
-| -------------- | ------ | ------ | --- | --- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| shell.exe      |        |        | ☑️  |     |     |                                                                                                                                                               |
+| Items     | 黃婧絜 | 鄒昱宸 | 蕭宏均 | 陳裕勛 | 李冠緯 | Description |
+| --------- | --- | --- | --- | --- | --- | ----------- |
+| shell.exe |     |     | ☑️  |     |     |             |
