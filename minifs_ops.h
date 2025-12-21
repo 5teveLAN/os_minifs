@@ -29,10 +29,19 @@ typedef struct  {
     uint8_t unused[8];     
 } FCB; 
 
+#ifdef __unix__
+typedef struct {
+    uint32_t file_id; //4byte
+    char file_name[60]; //60byte
+} __attribute__((packed)) Dentry;
+#else
+#pragma pack(push, 1)
 typedef struct {
     uint32_t file_id; //4byte
     char file_name[60]; //60byte
 } Dentry;
+#pragma pack(pop)
+#endif
 
 void fs_write_dentry(uint32_t dir_id,Dentry *new_dentry);
 
