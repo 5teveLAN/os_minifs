@@ -72,7 +72,7 @@ void mkdir(char* file_name){
     // add a dentry on current dir
 
     Dentry new_dentry; 
-    new_dentry.file_id   = new_dir_id;
+    new_dentry.file_id   = htonl(new_dir_id);
     strncpy(new_dentry.file_name, file_name, 60);
 
     fs_write_dentry(current_dir_id, &new_dentry);
@@ -120,7 +120,7 @@ void touch(char* file_name){
 
     // add a dentry on current dir
     Dentry new_dentry; 
-    new_dentry.file_id   = new_file_id;
+    new_dentry.file_id   = htonl(new_file_id);
     strncpy(new_dentry.file_name, file_name, 60);
 
     fs_write_dentry(current_dir_id, &new_dentry);
