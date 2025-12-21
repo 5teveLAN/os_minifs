@@ -25,7 +25,7 @@ typedef struct {
 typedef struct  {
     uint32_t is_dir; //4 byte
     uint32_t file_size; //4 byte
-    uint32_t dbp[3]; //16 byte
+    uint32_t dbp[4]; //16 byte
     uint8_t unused[8];     
 } FCB; 
 

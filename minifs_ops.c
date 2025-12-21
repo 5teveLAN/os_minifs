@@ -4,7 +4,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef _WIN32
+#include <winsock2.h>
+#else
 #include <arpa/inet.h>
+#endif
 #define DBP_COUNT 4
 #define DENTRY_SIZE 64
 #define DENTRY_COUNT 64
