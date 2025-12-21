@@ -1,17 +1,35 @@
 ### Compile
 1. Compile the header file 
-    `gcc -c minifs_ops.c -o minifs_ops.o`
+```bash
+gcc -c minifs_ops.c -o minifs_ops.o
+```
 2. Compile mkfs 
-   `gcc mkfs.c minifs_ops.o -o mkfs`
+```bash
+gcc mkfs.c minifs_ops.o -lws2_32 -o mkfs
+```
 3. Compile shell
-   `gcc shell.c minifs_ops.o -o shell`
+```bash
+gcc shell.c minifs_ops.o -lws2_32 -o shell
+```
 
 ### Create disk image
-`./mkfs disk.img 102400`
+```bash
+./mkfs disk.img 102400
+```
 
 ### View content
-1. Start from 10240 byte.
-    `xxd -c 16 -g 4 -s 10240 disk.img | less`
+1. Start from 10240 byte
+```bash
+# Linux/Git Bash
+xxd -c 16 -g 4 -s 10240 disk.img | less
+
+# Windows PowerShell (view bytes from offset 10240)
+$bytes = [System.IO.File]::ReadAllBytes("disk.img")
+$bytes[10240..11263] | Format-Hex
+
+# Or simply view the entire file
+Format-Hex disk.img | more
+```
 
 ### FS Structure
 
