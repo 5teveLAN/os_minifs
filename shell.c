@@ -123,7 +123,65 @@ void touch(char* file_name){
     
     return;
 }
+
+void append_to_file(char* file_name, char* content){
+    // Find the file
+    uint32_t file_id = 0;
+    for (uint32_t index = 0; index < 64; ++index){
+        Dentry dentry = fs_read_dentry(current_dir_id, index);
+        if (strcmp(dentry.file_name, file_name) == 0){
+            file_id = ntohl(dentry.file_id);
+            break;
+        }
+    }
     
+    if (file_id == 0){
+        printf("File %s not found!\n", file_name);
+        return;
+    }
+    
+    // Read FCB
+    FCB fcb = fs_read_fcb(file_id);
+    
+    // Check if it's a directory
+    if (fcb.is_dir){
+        printf("%s is a directory!\n", file_name);
+        return;
+    }
+    
+    // Calculate content length (add newline)
+    uint32_t content_len = strlen(content);
+    uint32_t new_size = fcb.file_size + content_len + 1; // +1 for newline
+    
+    // Write content to file
+    uint32_t offset = fcb.file_size;
+    for (uint32_t i = 0; i < content_len; i++){
+        uint32_t block_index = offset / 512;
+        uint32_t block_offset = offset % 512;
+        
+        if (block_index >= 4){
+            printf("File size exceeds maximum (2KB)!\n");
+            return;
+        }
+        
+        fs_write_char(fcb.dbp[block_index], block_offset, content[i]);
+        offset++;
+    }
+    
+    // Add newline
+    uint32_t block_index = offset / 512;
+    uint32_t block_offset = offset % 512;
+    if (block_index < 4){
+        fs_write_char(fcb.dbp[block_index], block_offset, '\n');
+        offset++;
+    }
+    
+    // Update FCB
+    fcb.file_size = offset;
+    fs_write_fcb(file_id, &fcb);
+    
+    printf("Appended to %s\n", file_name);
+}
 
 
 
@@ -156,6 +214,58 @@ int main(int argc, char* argv[]){
         input_line[strcspn(input_line, "\n")] = 0;
         if (input_line[0]=='\0')
             continue;
+        
+        // Check for append operation (>>)
+        char *append_op = strstr(input_line, ">>");
+        if (append_op != NULL) 
+        {
+            // 解析： echo "content" >> 文件名或內容 >> 文件名
+            *append_op = '\0';  // Split at >>
+            char *content_part = input_line;
+            char *filename = append_op + 2;  // Skip >>
+            
+            // 修剪內容部分的前導/尾隨空格
+            while (*content_part == ' ') content_part++;
+            char *content_end = content_part + strlen(content_part) - 1;
+            while (content_end > content_part && *content_end == ' ') {
+                *content_end = '\0';
+                content_end--;
+            }
+            
+            // 修剪文件名部分的前導/尾隨空格
+            while (*filename == ' ') filename++;
+            char *filename_end = filename + strlen(filename) - 1;
+            while (filename_end > filename && *filename_end == ' ') {
+                *filename_end = '\0';
+                filename_end--;
+            }
+            
+            // 檢查是否以 "echo" 開頭
+            char *content = content_part;
+            if (strncmp(content_part, "echo", 4) == 0) {
+                content = content_part + 4;
+                // Skip spaces after echo
+                while (*content == ' ') content++;
+                
+                // Remove quotes if present
+                if (*content == '"') {
+                    content++;
+                    char *end_quote = strrchr(content, '"');
+                    if (end_quote != NULL) {
+                        *end_quote = '\0';
+                    }
+                }
+            }
+            
+            if (strlen(content) == 0 || strlen(filename) == 0) {
+                printf("usage: echo \"<content>\" >> <file_name> or <content> >> <file_name>\n");
+                continue;
+            }
+            
+            append_to_file(filename, content);
+            continue;
+        }
+        
         command = strtok(input_line, " ");
         // continue split previous string
         argument = strtok(NULL, " "); 
