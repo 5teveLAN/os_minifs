@@ -77,11 +77,15 @@ void mkdir(char* file_name){
 
     fs_write_dentry(current_dir_id, &new_dentry);
 
-    // add ".." and "." to the new dir 
-    Dentry itself = {new_dir_id, "."}; 
+    // add "." and ".." to the new dir 
+    Dentry itself;
+    itself.file_id = htonl(new_dir_id);
+    strncpy(itself.file_name, ".", 60);
     fs_write_dentry(new_dir_id, &itself);
     
-    Dentry parent_dentry = {current_dir_id, ".."}; 
+    Dentry parent_dentry;
+    parent_dentry.file_id = htonl(current_dir_id);
+    strncpy(parent_dentry.file_name, "..", 60);
     fs_write_dentry(new_dir_id, &parent_dentry);
     
     return;
@@ -124,7 +128,8 @@ void touch(char* file_name){
     return;
 }
 
-void append_to_file(char* file_name, char* content){
+void append_to_file(char* file_name, char* content)
+{
     // Find the file
     uint32_t file_id = 0;
     for (uint32_t index = 0; index < 64; ++index){
@@ -183,7 +188,43 @@ void append_to_file(char* file_name, char* content){
     printf("Appended to %s\n", file_name);
 }
 
-
+void cd(char* dir_name){
+    // 查找目錄（-1表示未找到）
+    int32_t dir_id = -1;
+    size_t name_len = strlen(dir_name);
+    
+    for (uint32_t index = 0; index < 64; ++index){
+        Dentry dentry = fs_read_dentry(current_dir_id, index);
+        
+        // Skip empty entries
+        if (dentry.file_id == 0 && dentry.file_name[0] == '\0'){
+            continue;
+        }
+        
+        // 比較目錄名稱 - 精確匹配長度
+        if (memcmp(dentry.file_name, dir_name, name_len) == 0 &&
+            (dentry.file_name[name_len] == '\0' || name_len >= 59)){
+            dir_id = (int32_t)ntohl(dentry.file_id);
+            break;
+        }
+    }
+    
+    if (dir_id < 0){
+        printf("%s: No such directory!\n", dir_name);
+        return;
+    }
+    
+    // Check if it's a directory
+    FCB fcb = fs_read_fcb((uint32_t)dir_id);
+    if (!fcb.is_dir){
+        printf("%s is not a directory!\n", dir_name);
+        return;
+    }
+    
+    // Change to the new directory
+    current_dir_id = (uint32_t)dir_id;
+    printf("Changed to directory %d\n", current_dir_id);
+}
 
 int main(int argc, char* argv[]){
     char input_line[256];
@@ -217,7 +258,7 @@ int main(int argc, char* argv[]){
         
         // Check for append operation (>>)
         char *append_op = strstr(input_line, ">>");
-        if (append_op != NULL) 
+        if (append_op != NULL) //------------------------append----------------------
         {
             // 解析： echo "content" >> 文件名或內容 >> 文件名
             *append_op = '\0';  // Split at >>
@@ -287,6 +328,14 @@ int main(int argc, char* argv[]){
         else if (strcmp("ls", command) == 0){
             ls();
         }
+        else if (strcmp("cd", command) == 0){
+            if (argument == NULL){
+                printf("usage: cd <directory_name>\n");
+                continue;
+            }
+            cd(argument);
+        }
+        
         else if (strcmp("exit", command) == 0){
             break;
         }
