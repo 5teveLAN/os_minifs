@@ -3,6 +3,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#ifdef _WIN32
+#include <winsock2.h>
+#else
+#include <arpa/inet.h>
+#endif
 #include "minifs_ops.h"
 
 VCB vcb;
@@ -81,64 +86,43 @@ void mkdir(char* file_name){
     
     return;
 }
-/*
-uint32_t touch(char* file_name){
 
-    // 檢查目錄中是否已存在文件
-    uint32_t existing_inode = filefind(file_name);
-    if (existing_inode){
-        printf("File '%s' already exists (inode: %u)\n", file_name, existing_inode);
-
-        return EXIT_FAILURE;
+void touch(char* file_name){
+    // check if file name (not include '\0') > 59 
+    if (strlen(file_name)>59){
+        printf("exceeds the max len of file name: 60!\n");
+        return;
+    }
+    // check if name exists
+    if (find_file(current_dir_id, file_name)){
+        printf("file %s already exists!\n", file_name);
+        return;
     }
 
-    uint32_t inode_id = mkFCB();
-    uint32_t offset = (inode_id-1) * 64;
-
-    fs_write_uint32(10, offset, inode_id); //actually is dbp1 of root directory
-    for (int i = 0; file_name[i] != '\0' && i < 63; ++i) {
-        fs_write_char(10, offset + 4 + i, file_name[i]);
+    // check fcb remains
+    uint32_t new_file_id = fmap_new();
+    if (!new_file_id){
+        printf("No more free fcb!\n");
+        return;
     }
+
+    // it's a file, not a directory
+    FCB fcb = fs_read_fcb(new_file_id);
+    fcb.is_dir = 0;
+    fcb.file_size = 0;
+    fs_write_fcb(new_file_id, &fcb);
+
+    printf("Create new fcb: %d\n", new_file_id);
+
+    // add a dentry on current dir
+    Dentry new_dentry; 
+    new_dentry.file_id   = new_file_id;
+    strncpy(new_dentry.file_name, file_name, 60);
+
+    fs_write_dentry(current_dir_id, &new_dentry);
     
-    printf("File '%s' created (inode: %u)\n", file_name, inode_id);
-    FCB_CURRENT_NUMBER = inode_id;
-    fs_write_uint32(0,20,FCB_CURRENT_NUMBER);
+    return;
 }
-
-uint32_t append(char* file_name, char* S){
-    uint32_t inode = filefind(file_name);
-    if (!inode){
-        printf("Could not find the file: %s\n", file_name);
-        return EXIT_FAILURE;
-    }
-    // We assume that dbps are continuous
-    //read the block number of dbp1
-    uint32_t dbp[4];
-    for (int i = 0; i < 4; ++i)
-        dbp[i] = fs_read_uint32(2, inode*32+8+i*4);
-
-    printf("inode:%d\n", inode);
-    printf("DBP1:%d\n", dbp[1]);
-    printf("DBP2:%d\n", dbp[2]);
-    printf("DBP3:%d\n", dbp[3]);
-    printf("DBP4:%d\n", dbp[4]);
-
-    uint32_t k = 0;
-    // the char exceeds block size will not be appended
-    for (int i = 0; i < 4; ++i){
-        for (int j = 0; j < BLOCK_SIZE; ++j){
-            char c = fs_read_char(dbp[i],j);
-            if (c=='\0')
-                fs_write_char(dbp[i],j, file_name[k++]);
-            if (file_name[k]=='\0')
-                break;
-        }
-    }
-
-    return EXIT_SUCCESS;
-
-}
-*/
     
 
 
@@ -183,22 +167,19 @@ int main(int argc, char* argv[]){
             } 
             mkdir(argument);
         }
+        else if (strcmp("touch", command) == 0){
+            if (argument== NULL){
+                printf("usage: touch <file_name>\n");
+                continue;
+            } 
+            touch(argument);
+        }
+        else if (strcmp("ls", command) == 0){
+            ls();
+        }
         else if (strcmp("exit", command) == 0){
             break;
         }
-        /*
-        else if (strcmp("append", command) == 0){
-            char* content = strtok(NULL, " "); 
-            if (argument== NULL || content==NULL){
-                printf("usage: touch <file_name> <string>\n");
-                continue;
-            } 
-            append(argument, content);
-        }
-        else if (strcmp("fcb_number", command) == 0){
-            printf("FCB_CURRENT_NUMBER:%d\n",FCB_CURRENT_NUMBER);
-        }
-        */
     }
     free(bmap);
     free(fmap);
