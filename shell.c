@@ -156,11 +156,11 @@ void append_to_file(char* file_name, char* content){
     // Write content to file
     uint32_t offset = fcb.file_size;
     for (uint32_t i = 0; i < content_len; i++){
-        uint32_t block_index = offset / 512;
-        uint32_t block_offset = offset % 512;
+        uint32_t block_index = offset / vcb.block_size;
+        uint32_t block_offset = offset % vcb.block_size;
         
         if (block_index >= 4){
-            printf("File size exceeds maximum (2KB)!\n");
+            printf("File size exceeds maximum!\n");
             return;
         }
         
@@ -169,8 +169,8 @@ void append_to_file(char* file_name, char* content){
     }
     
     // Add newline
-    uint32_t block_index = offset / 512;
-    uint32_t block_offset = offset % 512;
+    uint32_t block_index = offset / vcb.block_size;
+    uint32_t block_offset = offset % vcb.block_size;
     if (block_index < 4){
         fs_write_char(fcb.dbp[block_index], block_offset, '\n');
         offset++;
