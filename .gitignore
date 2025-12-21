@@ -6,3 +6,7 @@ shell
 *.img
 *.swp
 *.o
+test_endian.*
+test_endian
+mkfs_linux
+shell_linux
