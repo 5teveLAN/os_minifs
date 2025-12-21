@@ -11,7 +11,30 @@ uint32_t current_dir_id;
 uint8_t *bmap, *fmap;
 
 uint32_t ls(){
-
+    printf("Contents of directory (ID: %d):\n", current_dir_id);
+    printf("%-8s %-60s\n", "ID", "Name");
+    printf("--------------------------------------------------------------------\n");
+    
+    uint32_t count = 0;
+    for (uint32_t index = 0; index < 64; ++index){
+        Dentry dentry = fs_read_dentry(current_dir_id, index);
+        
+        // Skip empty entries
+        if (dentry.file_id == 0 && dentry.file_name[0] == '\0'){
+            continue;
+        }
+        
+        // Convert from network byte order to host byte order
+        uint32_t file_id = ntohl(dentry.file_id);
+        
+        // Print the entry
+        printf("%-8d %-60s\n", file_id, dentry.file_name);
+        count++;
+    }
+    
+    printf("--------------------------------------------------------------------\n");
+    printf("Total: %d entries\n", count);
+    return count;
 }
 
 void mkdir(char* file_name){
