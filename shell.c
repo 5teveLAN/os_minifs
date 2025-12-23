@@ -4,9 +4,9 @@
 #include <stdbool.h>
 #include <string.h>
 #ifdef _WIN32
-#include <winsock2.h>
+#include <winsock2.h>//代表只要是 Windows 系統就包含這個頭檔
 #else
-#include <arpa/inet.h>
+#include <arpa/inet.h>//代表只要是 Linux 系統就包含這個頭檔
 #endif
 #include "minifs_ops.h"
 
@@ -77,7 +77,7 @@ void mkdir(char* file_name){
 
     fs_write_dentry(current_dir_id, &new_dentry);
 
-    // add "." and ".." to the new dir 
+    // 添加 ”。”和“..”到新目錄 
     Dentry itself;
     itself.file_id = htonl(new_dir_id);
     strncpy(itself.file_name, ".", 60);
