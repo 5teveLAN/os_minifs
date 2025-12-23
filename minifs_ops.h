@@ -35,6 +35,7 @@ typedef struct {
     char file_name[60]; //60byte
 } Dentry;
 #pragma pack(pop)
+void fs_delete_dentry(uint32_t dir_id, uint32_t index);
 
 void fs_write_dentry(uint32_t dir_id,Dentry *new_dentry);
 
@@ -68,5 +69,5 @@ void fmap_save();
 
 void debug_dump();
 
-bool find_file(uint32_t dir_id, char* file_name);
+uint32_t find_file(uint32_t dir_id, char* file_name);
 #endif

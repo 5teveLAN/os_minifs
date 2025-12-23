@@ -15,6 +15,20 @@ const char* FILE_NAME;
 uint32_t current_dir_id;
 uint8_t *bmap, *fmap;
 
+void rm(char* file_name){
+    // check if file name (not include '\0') > 59 
+    if (strlen(file_name)>59){
+        printf("exceeds the max len of file name: 60!\n");
+        return;
+    }
+
+    uint32_t index = find_file(current_dir_id,file_name);
+    Dentry dentry = fs_read_dentry(current_dir_id, index);
+    fs_delete_dentry(current_dir_id, index);
+    fmap[dentry.file_id] = 0;
+    fmap_save();
+
+}
 uint32_t ls(){
     printf("Contents of directory (ID: %d):\n", current_dir_id);
     printf("%-8s %-60s\n", "ID", "Name");
@@ -56,6 +70,7 @@ void mkdir(char* file_name){
 
     // check fcb remains
     uint32_t new_dir_id = fmap_new();
+    fmap_save();
     if (!new_dir_id){
         printf("No more free fcb!\n");
         return;
@@ -105,6 +120,7 @@ void touch(char* file_name){
 
     // check fcb remains
     uint32_t new_file_id = fmap_new();
+    fmap_save();
     if (!new_file_id){
         printf("No more free fcb!\n");
         return;
@@ -334,6 +350,13 @@ int main(int argc, char* argv[]){
                 continue;
             }
             cd(argument);
+        }
+        else if (strcmp("rm", command) == 0){
+            if (argument == NULL){
+                printf("usage: rm <file_name>\n");
+                continue;
+            }
+            rm(argument);
         }
         
         else if (strcmp("exit", command) == 0){

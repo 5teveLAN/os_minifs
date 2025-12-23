@@ -20,13 +20,14 @@ extern VCB vcb;
 // We want to write the dentry to its directory!
 // its directory = 
 
-bool find_file(uint32_t dir_id, char* file_name){
-    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
+uint32_t find_file(uint32_t dir_id, char* file_name){
+    for (uint32_t index = 1; index < DENTRY_COUNT; ++index){
         Dentry query_dir = fs_read_dentry(dir_id, index);
         if (strcmp(query_dir.file_name, file_name)==0) //no difference
-            return true;
+            return index;
+            // impossible to be '0'(root dir)
     }
-    return false;
+    return 0;
 }
 void fs_write_dentry(uint32_t dir_id,Dentry *new_dentry){
     uint32_t dir_dbp0 = fs_read_fcb(dir_id).dbp[0];
@@ -40,7 +41,8 @@ void fs_write_dentry(uint32_t dir_id,Dentry *new_dentry){
 
         if (query_dir.file_id == 0 && query_dir.file_name[0] == '\0'){
             FILE *fp = fopen(FILE_NAME, "r+b");
-            fseek(fp, dir_dbp0*vcb.block_size + index*DENTRY_SIZE, SEEK_SET);
+            uint32_t offset = dir_dbp0*vcb.block_size + index*DENTRY_SIZE;
+            fseek(fp, offset, SEEK_SET);
             fwrite(&temp_dentry, sizeof(Dentry), 1, fp);
             fclose(fp);
             printf("fount empty space for dentry! index: %d\n",index);
@@ -53,6 +55,20 @@ void fs_write_dentry(uint32_t dir_id,Dentry *new_dentry){
     printf("The directory is full!\n");
     return;
 
+}
+
+void fs_delete_dentry(uint32_t dir_id, uint32_t index){
+    FILE *fp = fopen(FILE_NAME, "r+b");
+    Dentry target_dentry = fs_read_dentry(dir_id, index);
+    FCB target_fcb = fs_read_fcb(target_dentry.file_id);
+    uint32_t dir_dbp0 = target_fcb.dbp[0];
+    uint32_t offset = dir_dbp0*vcb.block_size + index*DENTRY_SIZE;
+    Dentry temp_dentry;
+
+    memset(&temp_dentry, 0, sizeof(Dentry));
+    fseek(fp, offset, SEEK_SET);
+    fwrite(&temp_dentry, sizeof(Dentry), 1, fp);
+    fclose(fp);
 }
 
 Dentry fs_read_dentry(uint32_t dir_id, uint32_t index){
