@@ -4,10 +4,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#ifdef _WIN32
-#include <winsock2.h>
+#ifdef _WIN32 
+#include <winsock2.h>//代表只要是 Windows 系統就包含這個頭檔
 #else
-#include <arpa/inet.h>
+#include <arpa/inet.h>//代表只要是 Linux 系統就包含這個頭檔
 #endif
 #define DBP_COUNT 4
 #define DENTRY_SIZE 64
