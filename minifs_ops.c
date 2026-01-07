@@ -57,11 +57,17 @@ void fs_write_dentry(uint32_t dir_id,Dentry *new_dentry){
 
 }
 
+void print_dentry(Dentry* dentry){
+    printf("file_id   = %d \n", dentry->file_id);
+    printf("file_name = %s \n", dentry->file_name);
+
+} 
+
 void fs_delete_dentry(uint32_t dir_id, uint32_t index){
     FILE *fp = fopen(FILE_NAME, "r+b");
     Dentry target_dentry = fs_read_dentry(dir_id, index);
-    FCB target_fcb = fs_read_fcb(target_dentry.file_id);
-    uint32_t dir_dbp0 = target_fcb.dbp[0];
+    FCB dir_fcb = fs_read_fcb(dir_id);
+    uint32_t dir_dbp0 = dir_fcb.dbp[0];
     uint32_t offset = dir_dbp0*vcb.block_size + index*DENTRY_SIZE;
     Dentry temp_dentry;
 

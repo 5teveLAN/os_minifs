@@ -24,8 +24,10 @@ void rm(char* file_name){
 
     uint32_t index = find_file(current_dir_id,file_name);
     Dentry dentry = fs_read_dentry(current_dir_id, index);
+    printf("index=%d\n",index);
     fs_delete_dentry(current_dir_id, index);
-    fmap[dentry.file_id] = 0;
+    uint32_t file_id = ntohl(dentry.file_id);
+    fmap[file_id] = 0;
     fmap_save();
 
 }
