@@ -455,7 +455,10 @@ int main(int argc, char* argv[]){
         }
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
         // 檢查覆蓋操作 (>) 但不檢查 >>
         char *redir_op = strstr(input_line, ">");
         if (redir_op != NULL && (*(redir_op + 1) != '>')) //------------------------overwrite----------------------
