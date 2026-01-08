@@ -104,6 +104,24 @@ uint32_t fmap_new(){
         return id;
     }
 }
+
+//get unused block id
+uint32_t bmap_new(){
+    uint32_t block = 0;
+    for (uint32_t i = vcb.fcb_end_block + 1; i < vcb.block_count; ++i)
+        if (bmap[i]==0){
+            block = i;
+            break;
+        }
+    
+    if (!block){
+        return 0;
+    }
+    else {
+        bmap[block]=1;
+        return block;
+    }
+}
 // write fcb data in big-endian 
 void fs_write_fcb(uint32_t id,FCB *source_fcb){
     FILE *fp = fopen(FILE_NAME, "r+b");
@@ -238,13 +256,13 @@ void bmap_save(){
 
 void fmap_load(){
     for (uint32_t i = 0; i < vcb.fcb_count; ++i){
-        fmap[i] = fs_read_char(vcb.fmap_start_block,i);
+        fmap[i] = fs_read_char(vcb.fmap_start_block, i + 100);
     }
 }
 
 void fmap_save(){
     for (uint32_t i = 0; i < vcb.fcb_count; ++i){
-        fs_write_char(vcb.fmap_start_block,i,fmap[i]);
+        fs_write_char(vcb.fmap_start_block, i + 100, fmap[i]);
     }
 }
 

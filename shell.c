@@ -10,13 +10,15 @@
 #endif
 #include "minifs_ops.h"
 
+#define DENTRY_COUNT 16  // 1024 bytes / 64 bytes per dentry
+
 VCB vcb;
 const char* FILE_NAME;
 uint32_t current_dir_id;
 uint8_t *bmap, *fmap;
 
 static bool dir_is_empty(uint32_t dir_id){
-    for (uint32_t index = 0; index < 64; ++index){
+    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
         Dentry dentry = fs_read_dentry(dir_id, index);
         if (dentry.file_id == 0 && dentry.file_name[0] == '\0'){
             continue;
@@ -24,12 +26,44 @@ static bool dir_is_empty(uint32_t dir_id){
         if (strcmp(dentry.file_name, ".") == 0 || strcmp(dentry.file_name, "..") == 0){
             continue;
         }
+        // Debug: show unexpected non-empty entry
+        printf("dir %d: non-empty at index %d -> id=%d name='%.*s' bytes=%02x%02x%02x%02x\n",
+               dir_id, index, dentry.file_id, 16, dentry.file_name,
+               (unsigned char)dentry.file_name[0], (unsigned char)dentry.file_name[1],
+               (unsigned char)dentry.file_name[2], (unsigned char)dentry.file_name[3]);
         return false;
     }
     return true;
 }
 
-void rm(const char* file_name, bool allow_dir){
+static void rm_recursive(uint32_t dir_id){
+    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
+        Dentry dentry = fs_read_dentry(dir_id, index);
+        if (dentry.file_id == 0 && dentry.file_name[0] == '\0'){
+            continue;
+        }
+        if (strcmp(dentry.file_name, ".") == 0 || strcmp(dentry.file_name, "..") == 0){
+            continue;
+        }
+        uint32_t sub_file_id = dentry.file_id;
+        FCB sub_fcb = fs_read_fcb(sub_file_id);
+        if (sub_fcb.is_dir){
+            rm_recursive(sub_file_id);
+        }
+        // free block
+        if (sub_fcb.dbp[0]){
+            bmap[sub_fcb.dbp[0]] = 0;
+        }
+        // free fmap
+        fmap[sub_file_id] = 0;
+        // delete dentry
+        fs_delete_dentry(dir_id, index);
+    }
+    bmap_save();
+    fmap_save();
+}
+
+void rm(const char* file_name, bool allow_dir, bool recursive){
     // check if file name (not include '\0') > 59 
     if (strlen(file_name) > 59){
         printf("exceeds the max len of file name: 60!\n");
@@ -51,14 +85,22 @@ void rm(const char* file_name, bool allow_dir){
             printf("%s is a directory. Use rm -f <dir_name> to remove an empty directory.\n", file_name);
             return;
         }
-        if (!dir_is_empty(file_id)){
+        if (!recursive && !dir_is_empty(file_id)){
             printf("%s is not empty; remove its contents first.\n", file_name);
             return;
+        }
+        if (recursive){
+            rm_recursive(file_id);
         }
     }
 
     printf("Removing id=%d name=%s\n", file_id, file_name);
     fs_delete_dentry(current_dir_id, index);
+    // free block
+    if (fcb.dbp[0]){
+        bmap[fcb.dbp[0]] = 0;
+        bmap_save();
+    }
     fmap[file_id] = 0;
     fmap_save();
 }
@@ -68,7 +110,7 @@ uint32_t ls(){
     printf("--------------------------------------------------------------------\n");
     
     uint32_t count = 0;
-    for (uint32_t index = 0; index < 64; ++index){
+    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
         Dentry dentry = fs_read_dentry(current_dir_id, index);
         
         // Skip empty entries
@@ -106,9 +148,26 @@ void mkdir(char* file_name){
         return;
     }
 
+    // allocate block for directory data
+    uint32_t block = bmap_new();
+    bmap_save();
+    if (!block){
+        printf("No more free blocks!\n");
+        fmap[new_dir_id] = 0;
+        fmap_save();
+        return;
+    }
+
+    // zero out the new block for directory entries
+    for (uint32_t i = 0; i < vcb.block_size; i++){
+        fs_write_char(block, i, '\0');
+    }
+
     // change is_dir in its fcb
-    FCB fcb = fs_read_fcb(new_dir_id);
+    FCB fcb;
+    memset(&fcb, 0, sizeof(FCB));
     fcb.is_dir = 1;
+    fcb.dbp[0] = block;
     fs_write_fcb(new_dir_id, &fcb);
 
     printf("Create new fcb: %d\n", new_dir_id);
@@ -156,10 +215,21 @@ void touch(char* file_name){
         return;
     }
 
+    // allocate block for file data
+    uint32_t block = bmap_new();
+    bmap_save();
+    if (!block){
+        printf("No more free blocks!\n");
+        fmap[new_file_id] = 0;
+        fmap_save();
+        return;
+    }
+
     // it's a file, not a directory
     FCB fcb = fs_read_fcb(new_file_id);
     fcb.is_dir = 0;
     fcb.file_size = 0;
+    fcb.dbp[0] = block;
     fs_write_fcb(new_file_id, &fcb);
 
     printf("Create new fcb: %d\n", new_file_id);
@@ -178,7 +248,7 @@ void append_to_file(char* file_name, char* content)
 {
     // Find the file
     uint32_t file_id = 0;
-    for (uint32_t index = 0; index < 64; ++index){
+    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
         Dentry dentry = fs_read_dentry(current_dir_id, index);
         if (strcmp(dentry.file_name, file_name) == 0){
             file_id = dentry.file_id;
@@ -239,7 +309,7 @@ void cd(char* dir_name){
     int32_t dir_id = -1;
     size_t name_len = strlen(dir_name);
     
-    for (uint32_t index = 0; index < 64; ++index){
+    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
         Dentry dentry = fs_read_dentry(current_dir_id, index);
         
         // Skip empty entries
@@ -386,16 +456,26 @@ int main(int argc, char* argv[]){
         }
         
         else if (strcmp("rm", command) == 0){
-            bool force_dir = false;
-            if (argument != NULL && strcmp(argument, "-f") == 0){
-                force_dir = true;
-                argument = strtok(NULL, " ");
+            bool force = false;
+            bool recursive = false;
+            char* arg = argument;
+            if (arg != NULL && arg[0] == '-'){
+                for (size_t i = 1; arg[i] != '\0'; i++){
+                    if (arg[i] == 'f') force = true;
+                    else if (arg[i] == 'r') recursive = true;
+                    else {
+                        printf("Invalid option: -%c\n", arg[i]);
+                        goto next_command;
+                    }
+                }
+                arg = strtok(NULL, " ");
             }
-            if (argument == NULL){
-                printf("usage: rm [-f] <file_or_dir_name>\n");
+            if (arg == NULL){
+                printf("usage: rm [-rf] <file_or_dir_name>\n");
                 continue;
             }
-            rm(argument, force_dir);
+            rm(arg, force, recursive);
+            next_command:;
         }
         
         else if (strcmp("exit", command) == 0){

@@ -42,6 +42,8 @@ void fs_write_dentry(uint32_t dir_id,Dentry *new_dentry);
 
 uint32_t fmap_new();
 
+uint32_t bmap_new();
+
 Dentry fs_read_dentry(uint32_t dir_id, uint32_t index);
 
 void fs_write_fcb(uint32_t id,FCB *source_fcb);

@@ -59,8 +59,14 @@ void mk_vcb() {
 // allocate memory to bmap and fmap
 void mk_bmap(){
     bmap = (uint8_t *)calloc(vcb.block_count, sizeof(uint8_t));
-    for (uint32_t i = 0; i < vcb.block_count; ++i)
+    // Mark system blocks as used (VCB, bmap, fmap, FCB blocks)
+    for (uint32_t i = 0; i <= vcb.fcb_end_block; ++i)
         bmap[i] = 1;
+    // Mark data blocks as free
+    for (uint32_t i = vcb.fcb_end_block + 1; i < vcb.block_count; ++i)
+        bmap[i] = 0;
+    // Mark root directory's data block as used (block 10)
+    bmap[vcb.fcb_end_block + 1] = 1;
     bmap_save();
 }
 void mk_fmap(){
@@ -91,6 +97,13 @@ void mk_root(){
     FCB root_fcb = fs_read_fcb(0);
     root_fcb.is_dir = 1;
     fs_write_fcb(0, &root_fcb);
+    
+    // Zero out root directory block
+    uint32_t root_block = root_fcb.dbp[0];
+    for (uint32_t i = 0; i < 1024; i++){
+        fs_write_char(root_block, i, '\0');
+    }
+    
     Dentry itself = {0, "."}; //root fcb id = 0! name =  "."
     fs_write_dentry(0, &itself); // equals make a "." directory on root!
 
