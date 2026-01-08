@@ -454,6 +454,56 @@ int main(int argc, char* argv[]){
             continue;
         }
 
+<<<<<<< Updated upstream
+=======
+        // 檢查覆蓋操作 (>) 但不檢查 >>
+        char *redir_op = strstr(input_line, ">");
+        if (redir_op != NULL && (*(redir_op + 1) != '>')) //------------------------overwrite----------------------
+        {
+            *redir_op = '\0'; // split
+            char *content_part = input_line;
+            char *filename = redir_op + 1;
+
+            // 修剪內容部分
+            while (*content_part == ' ') content_part++;
+            char *content_end = content_part + strlen(content_part) - 1;
+            while (content_end > content_part && *content_end == ' ') {
+                *content_end = '\0';
+                content_end--;
+            }
+
+            // trim filename part
+            while (*filename == ' ') filename++;
+            char *filename_end = filename + strlen(filename) - 1;
+            while (filename_end > filename && *filename_end == ' ') {
+                *filename_end = '\0';
+                filename_end--;
+            }
+
+            // check if starts with echo
+            char *content = content_part;
+            if (strncmp(content_part, "echo", 4) == 0) {
+                content = content_part + 4;
+                while (*content == ' ') content++;
+                if (*content == '"') {
+                    content++;
+                    char *end_quote = strrchr(content, '"');
+                    if (end_quote != NULL) {
+                        *end_quote = '\0';
+                    }
+                }
+            }
+
+            if (strlen(content) == 0 || strlen(filename) == 0) {
+                printf("usage: echo \"<content>\" > <file_name> or <content> > <file_name>\n");
+                continue;
+            }
+
+            write_to_file(filename, content);
+            continue;
+        }
+
+>>>>>>> Stashed changes
         /*
         If is a nomral command
         */ 
