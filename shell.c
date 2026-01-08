@@ -43,7 +43,7 @@ void rm(const char* file_name, bool allow_dir){
     }
 
     Dentry dentry = fs_read_dentry(current_dir_id, index);
-    uint32_t file_id = ntohl(dentry.file_id);
+    uint32_t file_id = dentry.file_id;
     FCB fcb = fs_read_fcb(file_id);
 
     if (fcb.is_dir){
@@ -76,11 +76,8 @@ uint32_t ls(){
             continue;
         }
         
-        // Convert from network byte order to host byte order
-        uint32_t file_id = ntohl(dentry.file_id);
-        
-        // Print the entry
-        printf("%-8d %-60s\n", file_id, dentry.file_name);
+        // Print the entry (fs_read_dentry already converts to host byte order)
+        printf("%-8d %-60s\n", dentry.file_id, dentry.file_name);
         count++;
     }
     
@@ -125,14 +122,14 @@ void mkdir(char* file_name){
 
     fs_write_dentry(current_dir_id, &new_dentry);
 
-    // 添加 ”。”和“..”到新目錄 
+    // 添加 "." 和 ".." 到新目錄 
     Dentry itself;
-    itself.file_id = htonl(new_dir_id);
+    itself.file_id = new_dir_id;
     strncpy(itself.file_name, ".", 60);
     fs_write_dentry(new_dir_id, &itself);
     
     Dentry parent_dentry;
-    parent_dentry.file_id = htonl(current_dir_id);
+    parent_dentry.file_id = current_dir_id;
     strncpy(parent_dentry.file_name, "..", 60);
     fs_write_dentry(new_dir_id, &parent_dentry);
     
@@ -184,7 +181,7 @@ void append_to_file(char* file_name, char* content)
     for (uint32_t index = 0; index < 64; ++index){
         Dentry dentry = fs_read_dentry(current_dir_id, index);
         if (strcmp(dentry.file_name, file_name) == 0){
-            file_id = ntohl(dentry.file_id);
+            file_id = dentry.file_id;
             break;
         }
     }
@@ -253,7 +250,7 @@ void cd(char* dir_name){
         // 比較目錄名稱 - 精確匹配長度
         if (memcmp(dentry.file_name, dir_name, name_len) == 0 &&
             (dentry.file_name[name_len] == '\0' || name_len >= 59)){
-            dir_id = (int32_t)ntohl(dentry.file_id);
+            dir_id = (int32_t)dentry.file_id;
             break;
         }
     }
@@ -367,6 +364,7 @@ int main(int argc, char* argv[]){
             } 
             mkdir(argument);
         }
+
         else if (strcmp("touch", command) == 0){
             if (argument== NULL){
                 printf("usage: touch <file_name>\n");
@@ -374,9 +372,11 @@ int main(int argc, char* argv[]){
             } 
             touch(argument);
         }
+        
         else if (strcmp("ls", command) == 0){
             ls();
         }
+
         else if (strcmp("cd", command) == 0){
             if (argument == NULL){
                 printf("usage: cd <directory_name>\n");
@@ -384,6 +384,7 @@ int main(int argc, char* argv[]){
             }
             cd(argument);
         }
+        
         else if (strcmp("rm", command) == 0){
             bool force_dir = false;
             if (argument != NULL && strcmp(argument, "-f") == 0){

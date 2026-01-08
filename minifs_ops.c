@@ -84,6 +84,7 @@ Dentry fs_read_dentry(uint32_t dir_id, uint32_t index){
     fseek(fp, dir_dbp0*vcb.block_size  + index*DENTRY_SIZE, SEEK_SET);
     fread(&dentry, sizeof(Dentry), 1, fp);
     fclose(fp);
+    dentry.file_id = ntohl(dentry.file_id);  // 大端to host
     return dentry;
 }
 //get unused fcb id
