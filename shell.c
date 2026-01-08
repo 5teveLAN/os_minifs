@@ -63,12 +63,18 @@ static void rm_recursive(uint32_t dir_id){
     fmap_save();
 }
 
-void rm(const char* file_name, bool allow_dir, bool recursive){
+void rm(const char* file_name, char* options){
+    bool allow_dir = false , recursive = false;
     // check if file name (not include '\0') > 59 
     if (strlen(file_name) > 59){
         printf("exceeds the max len of file name: 60!\n");
         return;
     }
+
+    if (options && strchr(options, 'f'))
+        allow_dir = true;
+    if (options && strchr(options, 'r'))
+        recursive = true;
 
     uint32_t index = find_file(current_dir_id, (char*)file_name);
     if (index == 0){
@@ -104,8 +110,29 @@ void rm(const char* file_name, bool allow_dir, bool recursive){
     fmap[file_id] = 0;
     fmap_save();
 }
-uint32_t ls(){
-    printf("Contents of directory (ID: %d):\n", current_dir_id);
+uint32_t ls(char* file_name){
+    uint32_t target_dir_id;
+
+    if (file_name){
+        if (!find_file(current_dir_id , file_name)){
+            printf("No such file: %s\n", file_name);
+            return 0;
+        }
+        uint32_t index = find_file(current_dir_id,file_name);
+        Dentry dentry = fs_read_dentry(current_dir_id, index);
+        uint32_t dir_id = (int32_t)ntohl(dentry.file_id);
+        FCB target_fcb = fs_read_fcb(dir_id);
+        if (!target_fcb.is_dir){
+            printf("%s is not directory!\n", file_name);
+            return 0;
+        }
+        target_dir_id = dir_id;
+    }
+    else{
+        target_dir_id = current_dir_id;
+    }
+
+    printf("Contents of directory (ID: %d):\n", target_dir_id);
     printf("%-8s %-60s\n", "ID", "Name");
     printf("--------------------------------------------------------------------\n");
     
@@ -345,7 +372,9 @@ void cd(char* dir_name){
 int main(int argc, char* argv[]){
     char input_line[256];
     char *command;
-    char *argument;
+    char *options;
+    char *parameter;
+
     // check input
     if (argc!=2){
         fprintf(stderr, "Usage: %s <FILE_NAME>.", argv[0]);
@@ -371,7 +400,9 @@ int main(int argc, char* argv[]){
         input_line[strcspn(input_line, "\n")] = 0;
         if (input_line[0]=='\0')
             continue;
-        
+        /*
+        If is append command
+        */ 
         // Check for append operation (>>)
         char *append_op = strstr(input_line, ">>");
         if (append_op != NULL) //------------------------append----------------------
@@ -422,60 +453,71 @@ int main(int argc, char* argv[]){
             append_to_file(filename, content);
             continue;
         }
-        
+
+        /*
+        If is a nomral command
+        */ 
+        command = NULL;
+        options = NULL;
+        parameter = NULL;
+
+        // 1. Get command
         command = strtok(input_line, " ");
+        // 2. Get options array and parameter
         // continue split previous string
-        argument = strtok(NULL, " "); 
+        char* next_tok = strtok(NULL, " "); 
+        
+        if (next_tok){
+            // if with options
+            if (next_tok[0] == '-'){
+                options = next_tok;
+                parameter = strtok(NULL, " "); 
+            }
+            // if no options
+            else{
+                parameter = next_tok;
+            }
+        }
+        
+       // printf("command: %s\n", command ? command : "Nan");
+       // printf("options: %s\n", options ? options : "Nan");
+       // printf("parameter: %s\n", parameter ? parameter : "Nan" );
+       // continue;
 
         if (strcmp("mkdir", command) == 0){
-            if (argument== NULL){
+            if (parameter== NULL){
                 printf("usage: mkdir <file_name>\n");
                 continue;
             } 
-            mkdir(argument);
+            mkdir(parameter);
         }
 
         else if (strcmp("touch", command) == 0){
-            if (argument== NULL){
+            if (parameter== NULL){
                 printf("usage: touch <file_name>\n");
                 continue;
             } 
-            touch(argument);
+            touch(parameter);
         }
         
         else if (strcmp("ls", command) == 0){
-            ls();
+            ls(parameter);
         }
 
         else if (strcmp("cd", command) == 0){
-            if (argument == NULL){
+            if (parameter == NULL){
                 printf("usage: cd <directory_name>\n");
                 continue;
             }
-            cd(argument);
+            cd(parameter);
         }
         
         else if (strcmp("rm", command) == 0){
-            bool force = false;
-            bool recursive = false;
-            char* arg = argument;
-            if (arg != NULL && arg[0] == '-'){
-                for (size_t i = 1; arg[i] != '\0'; i++){
-                    if (arg[i] == 'f') force = true;
-                    else if (arg[i] == 'r') recursive = true;
-                    else {
-                        printf("Invalid option: -%c\n", arg[i]);
-                        goto next_command;
-                    }
-                }
-                arg = strtok(NULL, " ");
-            }
-            if (arg == NULL){
-                printf("usage: rm [-rf] <file_or_dir_name>\n");
+            if (parameter == NULL){
+                printf("usage: rm <file_name>\n");
                 continue;
             }
-            rm(arg, force, recursive);
-            next_command:;
+            rm(parameter, options);
         }
         
         else if (strcmp("exit", command) == 0){
