@@ -331,6 +331,107 @@ void append_to_file(char* file_name, char* content)
     printf("Appended to %s\n", file_name);
 }
 
+void overwrite_file(char* file_name, char* content)
+{
+    // Find the file
+    uint32_t file_id = 0;
+    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
+        Dentry dentry = fs_read_dentry(current_dir_id, index);
+        if (strcmp(dentry.file_name, file_name) == 0){
+            file_id = dentry.file_id;
+            break;
+        }
+    }
+    
+    if (file_id == 0){
+        printf("File %s not found!\n", file_name);
+        return;
+    }
+    
+    FCB fcb = fs_read_fcb(file_id);
+    if (fcb.is_dir){
+        printf("%s is a directory!\n", file_name);
+        return;
+    }
+    
+    // Write content to file starting at offset 0 (overwrite/truncate)
+    uint32_t content_len = strlen(content);
+    uint32_t offset = 0;
+    for (uint32_t i = 0; i < content_len; i++){
+        uint32_t block_index = offset / vcb.block_size;
+        uint32_t block_offset = offset % vcb.block_size;
+        
+        if (block_index >= 4){
+            printf("File size exceeds maximum!\n");
+            return;
+        }
+        
+        fs_write_char(fcb.dbp[block_index], block_offset, content[i]);
+        offset++;
+    }
+    
+    // Add newline
+    uint32_t block_index = offset / vcb.block_size;
+    uint32_t block_offset = offset % vcb.block_size;
+    if (block_index < 4){
+        fs_write_char(fcb.dbp[block_index], block_offset, '\n');
+        offset++;
+    }
+    
+    // Update FCB
+    fcb.file_size = offset;
+    fs_write_fcb(file_id, &fcb);
+    
+    printf("Wrote to %s\n", file_name);
+}
+void cat(char* file_name){
+    // Find the file
+    uint32_t file_id = 0;
+    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
+        Dentry dentry = fs_read_dentry(current_dir_id, index);
+        if (strcmp(dentry.file_name, file_name) == 0){
+            file_id = dentry.file_id;
+            break;
+        }
+    }
+
+    if (file_id == 0){
+        printf("File %s not found!\n", file_name);
+        return;
+    }
+
+    FCB fcb = fs_read_fcb(file_id);
+    if (fcb.is_dir){
+        printf("%s is a directory!\n", file_name);
+        return;
+    }
+
+    if (fcb.file_size == 0){
+        // empty file — nothing to print
+        return;
+    }
+
+    uint32_t offset = 0;
+    for (; offset < fcb.file_size; ++offset){
+        uint32_t block_index = offset / vcb.block_size;
+        uint32_t block_offset = offset % vcb.block_size;
+        if (block_index >= 4){
+            break;
+        }
+        uint8_t ch = fs_read_char(fcb.dbp[block_index], block_offset);
+        putchar((char)ch);
+    }
+
+    // Ensure trailing newline for tidy output
+    if (fcb.file_size > 0){
+        uint32_t last_off = fcb.file_size - 1;
+        uint32_t last_block = last_off / vcb.block_size;
+        uint32_t last_block_offset = last_off % vcb.block_size;
+        if (fs_read_char(fcb.dbp[last_block], last_block_offset) != '\n')
+            putchar('\n');
+    }
+}
+
 void cd(char* dir_name){
     // 查找目錄（-1表示未找到）
     int32_t dir_id = -1;
@@ -454,40 +555,38 @@ int main(int argc, char* argv[]){
             continue;
         }
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
-=======
->>>>>>> Stashed changes
-        // 檢查覆蓋操作 (>) 但不檢查 >>
+        // Check for overwrite operation (single '>')
         char *redir_op = strstr(input_line, ">");
-        if (redir_op != NULL && (*(redir_op + 1) != '>')) //------------------------overwrite----------------------
+        if (redir_op != NULL && !(redir_op[1] == '>')) //---------------------overwrite-------------------
         {
-            *redir_op = '\0'; // split
+            *redir_op = '\0';  // Split at >
             char *content_part = input_line;
-            char *filename = redir_op + 1;
-
-            // 修剪內容部分
+            char *filename = redir_op + 1;  // Skip >
+            
+            // 修剪內容部分的前導/尾隨空格
             while (*content_part == ' ') content_part++;
             char *content_end = content_part + strlen(content_part) - 1;
             while (content_end > content_part && *content_end == ' ') {
                 *content_end = '\0';
                 content_end--;
             }
-
-            // trim filename part
+            
+            // 修剪文件名部分的前導/尾隨空格
             while (*filename == ' ') filename++;
             char *filename_end = filename + strlen(filename) - 1;
             while (filename_end > filename && *filename_end == ' ') {
                 *filename_end = '\0';
                 filename_end--;
             }
-
-            // check if starts with echo
+            
+            // 檢查是否以 "echo" 開頭
             char *content = content_part;
             if (strncmp(content_part, "echo", 4) == 0) {
                 content = content_part + 4;
+                // Skip spaces after echo
                 while (*content == ' ') content++;
+                
+                // Remove quotes if present
                 if (*content == '"') {
                     content++;
                     char *end_quote = strrchr(content, '"');
@@ -496,17 +595,21 @@ int main(int argc, char* argv[]){
                     }
                 }
             }
-
-            if (strlen(content) == 0 || strlen(filename) == 0) {
+            
+            if (strlen(filename) == 0) {
                 printf("usage: echo \"<content>\" > <file_name> or <content> > <file_name>\n");
                 continue;
             }
-
-            write_to_file(filename, content);
+            
+            // Create file if not exists
+            if (!find_file(current_dir_id, filename)){
+                touch(filename);
+            }
+            
+            overwrite_file(filename, content);
             continue;
         }
 
->>>>>>> Stashed changes
         /*
         If is a nomral command
         */ 
@@ -555,6 +658,14 @@ int main(int argc, char* argv[]){
         
         else if (strcmp("ls", command) == 0){
             ls(parameter);
+        }
+
+        else if (strcmp("cat", command) == 0){
+            if (parameter == NULL){
+                printf("usage: cat <file_name>\n");
+                continue;
+            }
+            cat(parameter);
         }
 
         else if (strcmp("cd", command) == 0){
