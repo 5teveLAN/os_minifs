@@ -15,21 +15,52 @@ const char* FILE_NAME;
 uint32_t current_dir_id;
 uint8_t *bmap, *fmap;
 
-void rm(char* file_name){
+static bool dir_is_empty(uint32_t dir_id){
+    for (uint32_t index = 0; index < 64; ++index){
+        Dentry dentry = fs_read_dentry(dir_id, index);
+        if (dentry.file_id == 0 && dentry.file_name[0] == '\0'){
+            continue;
+        }
+        if (strcmp(dentry.file_name, ".") == 0 || strcmp(dentry.file_name, "..") == 0){
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
+
+void rm(const char* file_name, bool allow_dir){
     // check if file name (not include '\0') > 59 
-    if (strlen(file_name)>59){
+    if (strlen(file_name) > 59){
         printf("exceeds the max len of file name: 60!\n");
         return;
     }
 
-    uint32_t index = find_file(current_dir_id,file_name);
+    uint32_t index = find_file(current_dir_id, (char*)file_name);
+    if (index == 0){
+        printf("%s not found!\n", file_name);
+        return;
+    }
+
     Dentry dentry = fs_read_dentry(current_dir_id, index);
-    printf("index=%d\n",index);
-    fs_delete_dentry(current_dir_id, index);
     uint32_t file_id = ntohl(dentry.file_id);
+    FCB fcb = fs_read_fcb(file_id);
+
+    if (fcb.is_dir){
+        if (!allow_dir){
+            printf("%s is a directory. Use rm -f <dir_name> to remove an empty directory.\n", file_name);
+            return;
+        }
+        if (!dir_is_empty(file_id)){
+            printf("%s is not empty; remove its contents first.\n", file_name);
+            return;
+        }
+    }
+
+    printf("Removing id=%d name=%s\n", file_id, file_name);
+    fs_delete_dentry(current_dir_id, index);
     fmap[file_id] = 0;
     fmap_save();
-
 }
 uint32_t ls(){
     printf("Contents of directory (ID: %d):\n", current_dir_id);
@@ -354,11 +385,16 @@ int main(int argc, char* argv[]){
             cd(argument);
         }
         else if (strcmp("rm", command) == 0){
+            bool force_dir = false;
+            if (argument != NULL && strcmp(argument, "-f") == 0){
+                force_dir = true;
+                argument = strtok(NULL, " ");
+            }
             if (argument == NULL){
-                printf("usage: rm <file_name>\n");
+                printf("usage: rm [-f] <file_or_dir_name>\n");
                 continue;
             }
-            rm(argument);
+            rm(argument, force_dir);
         }
         
         else if (strcmp("exit", command) == 0){
