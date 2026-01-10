@@ -77,7 +77,6 @@ void mk_fmap(){
 }
 // create all fcb to from fcb_start_block to fcb_end_block 
 void mk_fcb(){
-    uint32_t offset;
     FCB fcb;
 
     for (int i = 0; i < vcb.fcb_count; ++i){
@@ -98,10 +97,19 @@ void mk_root(){
     root_fcb.is_dir = 1;
     fs_write_fcb(0, &root_fcb);
     
+    uint32_t block[4] = {0};
+    for (int i = 0; i < 4; ++i){
+        block[i] = bmap_new();
+    }
+    for (int i = 0; i < 4; ++i){
+        bmap[block[i]]  = 1;
+    }
+    bmap_save();
     // Zero out root directory block
-    uint32_t root_block = root_fcb.dbp[0];
-    for (uint32_t i = 0; i < 1024; i++){
-        fs_write_char(root_block, i, '\0');
+    for (uint32_t i = 0; i < 4; i++){
+    for (uint32_t j = 0; j < 1024; j++){
+        fs_write_char(block[i], j, '\0');
+    }
     }
     
     Dentry itself = {0, "."}; //root fcb id = 0! name =  "."

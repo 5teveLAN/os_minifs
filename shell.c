@@ -10,12 +10,16 @@
 #endif
 #include "minifs_ops.h"
 
-#define DENTRY_COUNT 16  // 1024 bytes / 64 bytes per dentry
+#define DBP_COUNT 4
+#define DENTRY_SIZE 64
+#define DENTRY_COUNT 64
+#define INVALID_ID 0xFFFFFFFF
 
 VCB vcb;
 const char* FILE_NAME;
-uint32_t current_dir_id;
+uint32_t working_dir_id;
 uint8_t *bmap, *fmap;
+char current_path[256];
 
 static bool dir_is_empty(uint32_t dir_id){
     for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
@@ -51,8 +55,8 @@ static void rm_recursive(uint32_t dir_id){
             rm_recursive(sub_file_id);
         }
         // free block
-        if (sub_fcb.dbp[0]){
-            bmap[sub_fcb.dbp[0]] = 0;
+        for (int i = 0; i < DBP_COUNT; ++i){
+            bmap[sub_fcb.dbp[i]] = 0;
         }
         // free fmap
         fmap[sub_file_id] = 0;
@@ -63,28 +67,14 @@ static void rm_recursive(uint32_t dir_id){
     fmap_save();
 }
 
-void rm(const char* file_name, char* options){
+void rm(uint32_t parent_id, uint32_t file_id, char* file_name, char* options){
     bool allow_dir = false , recursive = false;
-    // check if file name (not include '\0') > 59 
-    if (strlen(file_name) > 59){
-        printf("exceeds the max len of file name: 60!\n");
-        return;
-    }
-
+    FCB fcb = fs_read_fcb(file_id);
     if (options && strchr(options, 'f'))
         allow_dir = true;
     if (options && strchr(options, 'r'))
         recursive = true;
 
-    uint32_t index = find_file(current_dir_id, (char*)file_name);
-    if (index == 0){
-        printf("%s not found!\n", file_name);
-        return;
-    }
-
-    Dentry dentry = fs_read_dentry(current_dir_id, index);
-    uint32_t file_id = dentry.file_id;
-    FCB fcb = fs_read_fcb(file_id);
 
     if (fcb.is_dir){
         if (!allow_dir){
@@ -101,36 +91,17 @@ void rm(const char* file_name, char* options){
     }
 
     printf("Removing id=%d name=%s\n", file_id, file_name);
-    fs_delete_dentry(current_dir_id, index);
+    uint32_t index = find_file(parent_id, file_name);
+    fs_delete_dentry(parent_id, index);
     // free block
-    if (fcb.dbp[0]){
-        bmap[fcb.dbp[0]] = 0;
+    for (int i = 0; i < DBP_COUNT; ++i){
+        bmap[fcb.dbp[i]] = 0;
         bmap_save();
     }
     fmap[file_id] = 0;
     fmap_save();
 }
-uint32_t ls(char* file_name){
-    uint32_t target_dir_id;
-
-    if (file_name){
-        if (!find_file(current_dir_id , file_name)){
-            printf("No such file: %s\n", file_name);
-            return 0;
-        }
-        uint32_t index = find_file(current_dir_id,file_name);
-        Dentry dentry = fs_read_dentry(current_dir_id, index);
-        uint32_t dir_id = (int32_t)ntohl(dentry.file_id);
-        FCB target_fcb = fs_read_fcb(dir_id);
-        if (!target_fcb.is_dir){
-            printf("%s is not directory!\n", file_name);
-            return 0;
-        }
-        target_dir_id = dir_id;
-    }
-    else{
-        target_dir_id = current_dir_id;
-    }
+uint32_t ls(uint32_t target_dir_id){
 
     printf("Contents of directory (ID: %d):\n", target_dir_id);
     printf("%-8s %-60s\n", "ID", "Name");
@@ -138,7 +109,7 @@ uint32_t ls(char* file_name){
     
     uint32_t count = 0;
     for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
-        Dentry dentry = fs_read_dentry(current_dir_id, index);
+        Dentry dentry = fs_read_dentry(target_dir_id, index);
         
         // Skip empty entries
         if (dentry.file_id == 0 && dentry.file_name[0] == '\0'){
@@ -155,15 +126,10 @@ uint32_t ls(char* file_name){
     return count;
 }
 
-void mkdir(char* file_name){
+void mkdir(uint32_t parent_id, char* file_name){
     // check if file name (not include '\0') > 59 
     if (strlen(file_name)>59){
         printf("exceeds the max len of file name: 60!\n");
-        return;
-    }
-    // check if name exists
-    if (find_file(current_dir_id, file_name)){
-        printf("file %s already exists!\n", file_name);
         return;
     }
 
@@ -176,29 +142,41 @@ void mkdir(char* file_name){
     }
 
     // allocate block for directory data
-    uint32_t block = bmap_new();
-    bmap_save();
-    if (!block){
+    uint32_t block[4] = {0};
+    for (int i = 0; i < 4; ++i){
+        block[i] = bmap_new();
+    }
+    for (int i = 0; i < 4; ++i){
+    if (!block[i]){
         printf("No more free blocks!\n");
         fmap[new_dir_id] = 0;
         fmap_save();
         return;
     }
-
-    // zero out the new block for directory entries
-    for (uint32_t i = 0; i < vcb.block_size; i++){
-        fs_write_char(block, i, '\0');
     }
+
+    for (int i = 0; i < 4; ++i){
+        bmap[block[i]]  = 1;
+    }
+    bmap_save();
+    
+    // zero out the new block for directory entries
+    /* BUG CODE
+    for (int i = 0; i < 4; ++i){
+        for (uint32_t j = 0; j < vcb.block_size; j++){
+            fs_write_char(block[i], j, '\0');
+        }
+    }
+    */
+     
 
     // change is_dir in its fcb
     FCB fcb;
     memset(&fcb, 0, sizeof(FCB));
     fcb.is_dir = 1;
-    fcb.dbp[0] = block;
+    for (int i = 0; i < 4; ++i)
+        fcb.dbp[i] = block[i];
     fs_write_fcb(new_dir_id, &fcb);
-
-    printf("Create new fcb: %d\n", new_dir_id);
-    printf("dbp[0] at block %d\n", fcb.dbp[0]);
 
     // add a dentry on current dir
 
@@ -206,7 +184,7 @@ void mkdir(char* file_name){
     new_dentry.file_id   = new_dir_id;
     strncpy(new_dentry.file_name, file_name, 60);
 
-    fs_write_dentry(current_dir_id, &new_dentry);
+    fs_write_dentry(parent_id, &new_dentry);
 
     // 添加 "." 和 ".." 到新目錄 
     Dentry itself;
@@ -215,22 +193,18 @@ void mkdir(char* file_name){
     fs_write_dentry(new_dir_id, &itself);
     
     Dentry parent_dentry;
-    parent_dentry.file_id = current_dir_id;
+    parent_dentry.file_id = working_dir_id;
     strncpy(parent_dentry.file_name, "..", 60);
     fs_write_dentry(new_dir_id, &parent_dentry);
+    
     
     return;
 }
 
-void touch(char* file_name){
+void touch(uint32_t parent_id, char* file_name){
     // check if file name (not include '\0') > 59 
     if (strlen(file_name)>59){
         printf("exceeds the max len of file name: 60!\n");
-        return;
-    }
-    // check if name exists
-    if (find_file(current_dir_id, file_name)){
-        printf("file %s already exists!\n", file_name);
         return;
     }
 
@@ -241,32 +215,39 @@ void touch(char* file_name){
         printf("No more free fcb!\n");
         return;
     }
-
     // allocate block for file data
-    uint32_t block = bmap_new();
-    bmap_save();
-    if (!block){
+    uint32_t block[4] = {0};
+    for (int i = 0; i < 4; ++i){
+        block[i] = bmap_new();
+    }
+    for (int i = 0; i < 4; ++i){
+    if (!block[i]){
         printf("No more free blocks!\n");
         fmap[new_file_id] = 0;
         fmap_save();
         return;
     }
+    }
+    for (int i = 0; i < 4; ++i){
+        bmap[block[i]]  = 1;
+    }
 
+    bmap_save();
     // it's a file, not a directory
     FCB fcb = fs_read_fcb(new_file_id);
     fcb.is_dir = 0;
     fcb.file_size = 0;
-    fcb.dbp[0] = block;
-    fs_write_fcb(new_file_id, &fcb);
+    for (int i = 0; i < 4; ++i)
+        fcb.dbp[i] = block[i];
 
-    printf("Create new fcb: %d\n", new_file_id);
+    fs_write_fcb(new_file_id, &fcb);
 
     // add a dentry on current dir
     Dentry new_dentry; 
     new_dentry.file_id   = new_file_id;
     strncpy(new_dentry.file_name, file_name, 60);
 
-    fs_write_dentry(current_dir_id, &new_dentry);
+    fs_write_dentry(parent_id, &new_dentry);
     
     return;
 }
@@ -276,7 +257,7 @@ void append_to_file(char* file_name, char* content)
     // Find the file
     uint32_t file_id = 0;
     for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
-        Dentry dentry = fs_read_dentry(current_dir_id, index);
+        Dentry dentry = fs_read_dentry(working_dir_id, index);
         if (strcmp(dentry.file_name, file_name) == 0){
             file_id = dentry.file_id;
             break;
@@ -299,7 +280,7 @@ void append_to_file(char* file_name, char* content)
     
     // Calculate content length (add newline)
     uint32_t content_len = strlen(content);
-    uint32_t new_size = fcb.file_size + content_len + 1; // +1 for newline
+    //uint32_t new_size = fcb.file_size + content_len + 1; // +1 for newline
     
     // Write content to file
     uint32_t offset = fcb.file_size;
@@ -336,7 +317,7 @@ void overwrite_file(char* file_name, char* content)
     // Find the file
     uint32_t file_id = 0;
     for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
-        Dentry dentry = fs_read_dentry(current_dir_id, index);
+        Dentry dentry = fs_read_dentry(working_dir_id, index);
         if (strcmp(dentry.file_name, file_name) == 0){
             file_id = dentry.file_id;
             break;
@@ -384,25 +365,10 @@ void overwrite_file(char* file_name, char* content)
     
     printf("Wrote to %s\n", file_name);
 }
-void cat(char* file_name){
-    // Find the file
-    uint32_t file_id = 0;
-    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
-        Dentry dentry = fs_read_dentry(current_dir_id, index);
-        if (strcmp(dentry.file_name, file_name) == 0){
-            file_id = dentry.file_id;
-            break;
-        }
-    }
-
-    if (file_id == 0){
-        printf("File %s not found!\n", file_name);
-        return;
-    }
-
+void cat(uint32_t file_id){
     FCB fcb = fs_read_fcb(file_id);
     if (fcb.is_dir){
-        printf("%s is a directory!\n", file_name);
+        printf("Is a directory!\n");
         return;
     }
 
@@ -432,42 +398,116 @@ void cat(char* file_name){
     }
 }
 
-void cd(char* dir_name){
-    // 查找目錄（-1表示未找到）
-    int32_t dir_id = -1;
-    size_t name_len = strlen(dir_name);
-    
-    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
-        Dentry dentry = fs_read_dentry(current_dir_id, index);
-        
-        // Skip empty entries
-        if (dentry.file_id == 0 && dentry.file_name[0] == '\0'){
-            continue;
-        }
-        
-        // 比較目錄名稱 - 精確匹配長度
-        if (memcmp(dentry.file_name, dir_name, name_len) == 0 &&
-            (dentry.file_name[name_len] == '\0' || name_len >= 59)){
-            dir_id = (int32_t)dentry.file_id;
-            break;
-        }
-    }
-    
-    if (dir_id < 0){
-        printf("%s: No such directory!\n", dir_name);
-        return;
-    }
-    
-    // Check if it's a directory
-    FCB fcb = fs_read_fcb((uint32_t)dir_id);
+void cd(uint32_t dir_id){
+    FCB fcb = fs_read_fcb(dir_id);
     if (!fcb.is_dir){
-        printf("%s is not a directory!\n", dir_name);
+        printf("Is not a directory!\n");
         return;
     }
     
     // Change to the new directory
-    current_dir_id = (uint32_t)dir_id;
-    printf("Changed to directory %d\n", current_dir_id);
+    working_dir_id = (uint32_t)dir_id;
+    printf("Changed to directory %d\n", working_dir_id);
+}
+
+void resolve_path(char* path, uint32_t* parent_id, uint32_t* file_id, char* file_name){
+    char* path_tok[256] = {NULL};
+    char* next_tok = strtok(path, "/"); 
+    uint32_t temp_parent_id =0, temp_file_id;
+    int n_token = 0, vaild_count = 0;
+    Dentry dentry;
+
+    // 1. is absolute?
+    if (path[0]=='/')
+        temp_file_id = 0;
+    else 
+        temp_file_id = working_dir_id;
+
+    while (next_tok){
+        path_tok[n_token++] = next_tok;
+        next_tok = strtok(NULL, "/");
+    }
+
+    // 2. look forward
+    while(get_file_dentry(temp_file_id, path_tok[vaild_count], &dentry)){
+        temp_parent_id = temp_file_id;
+        temp_file_id = dentry.file_id;
+        vaild_count++;
+    }
+
+    // Three condition:
+    // 1. Get parent, Get file (count = n_token)
+    //    -> No this path, return (parent,    file)
+    // 2. Get parent, No  file (count = n_token -1)
+    //    -> No this path, return (parent, INVALID)
+    // 3. No  parent, No  file (other)
+    //    -> No this path, return false
+
+    if (vaild_count == n_token){
+        *parent_id = temp_parent_id;
+        *file_id = temp_file_id;
+        strncpy(file_name , path_tok[n_token-1], 60); //last tok
+    }
+    else if (vaild_count == n_token -1){
+        *parent_id = temp_parent_id;
+        *file_id = INVALID_ID;
+        strncpy(file_name , path_tok[n_token-1], 60);
+    }
+    else {
+        *parent_id =INVALID_ID; 
+        *file_id = INVALID_ID;
+    }
+
+}
+
+void update_current_path(){
+    char path_tok[256][60];
+    memset(path_tok, 0, sizeof(path_tok));
+    int cnt = 0;
+    Dentry parent_dentry;
+    uint32_t dir_id = working_dir_id;
+    uint32_t parent_dir_id;
+    while (true){
+        if (!get_file_dentry(dir_id,"..", &parent_dentry)) break;
+        parent_dir_id = parent_dentry.file_id;
+        find_file_name_by_id(parent_dir_id, dir_id, path_tok[cnt++]);
+        dir_id = parent_dentry.file_id;
+    } 
+    memset(current_path, 0, sizeof(current_path));
+
+    if (cnt==0){ //in root
+        strcat(current_path, "/");
+    }
+    while (cnt>0){
+        strcat(current_path, "/");
+	    strcat(current_path, path_tok[--cnt]);
+    }
+}
+
+void pwd(){
+    update_current_path();
+    printf("%s\n", current_path);
+}
+
+void stat(uint32_t file_id){
+    // 1. 呼叫你現有的函式讀取 FCB
+	FCB fcb = fs_read_fcb(file_id);
+
+	printf("======= FCB Structure Info (ID: %u) =======\n", file_id);
+	
+	// 2. 印出類型 (Directory 或 File)
+	printf("Type:       %s\n", fcb.is_dir ? "Directory" : "File");
+	
+	// 3. 印出檔案大小
+	printf("File Size:  %u bytes\n", fcb.file_size);
+	
+	// 4. 展開印出 Data Block Pointers (DBP)
+	printf("Data Blocks:\n");
+	for (int i = 0; i < 4; i++) {
+		printf("  [DBP %d]:   %u\n", i, fcb.dbp[i]);
+	}
+	
+	printf("===========================================\n");
 }
 
 int main(int argc, char* argv[]){
@@ -475,6 +515,7 @@ int main(int argc, char* argv[]){
     char *command;
     char *options;
     char *parameter;
+    char path[256];
 
     // check input
     if (argc!=2){
@@ -503,7 +544,7 @@ int main(int argc, char* argv[]){
             continue;
         /*
         If is append command
-        */ 
+         
         // Check for append operation (>>)
         char *append_op = strstr(input_line, ">>");
         if (append_op != NULL) //------------------------append----------------------
@@ -602,13 +643,14 @@ int main(int argc, char* argv[]){
             }
             
             // Create file if not exists
-            if (!find_file(current_dir_id, filename)){
-                touch(filename);
+            if (!find_file(parent_id, filename)){
+                touch(parent_id, filename);
             }
             
             overwrite_file(filename, content);
             continue;
         }
+        */
 
         /*
         If is a nomral command
@@ -616,13 +658,16 @@ int main(int argc, char* argv[]){
         command = NULL;
         options = NULL;
         parameter = NULL;
+        memset(path, 0, sizeof(path));
 
+        char* next_tok = NULL;
         // 1. Get command
         command = strtok(input_line, " ");
-        // 2. Get options array and parameter
+        // 2. Get options array and path
         // continue split previous string
-        char* next_tok = strtok(NULL, " "); 
+        next_tok = strtok(NULL, " "); 
         
+
         if (next_tok){
             // if with options
             if (next_tok[0] == '-'){
@@ -634,58 +679,167 @@ int main(int argc, char* argv[]){
                 parameter = next_tok;
             }
         }
-        
-       // printf("command: %s\n", command ? command : "Nan");
-       // printf("options: %s\n", options ? options : "Nan");
-       // printf("parameter: %s\n", parameter ? parameter : "Nan" );
-       // continue;
 
-        if (strcmp("mkdir", command) == 0){
+        uint32_t parent_id, file_id;
+        char file_name[60];
+        if (parameter)
+            strncpy(path, parameter, 256);
+        if (path[0] != '\0')
+            resolve_path(path, &parent_id, &file_id, file_name);
+
+        /* 
+           * illegle path
+           pid = INVALID, fid = INVALID
+
+           Three Type of Commands:
+
+           Type 1. The file/dir must exist 
+              (ls, cat, cd, rm, stat)
+           pid = n, fid = n
+
+           Type 2. Create file/dir on parent path (mkdir, touch)
+              (mkdir, touch)
+           pid = n, fid = INVALID
+
+           Type 3. No options, No parameters
+               (pwd) 
+
+        */
+
+        if (parameter && parent_id == INVALID_ID && file_id == INVALID_ID){
+            printf("No such path!\n");
+            continue;
+        }
+        // Type 1
+        if (strcmp("ls", command) == 0){
+            // 1. Command check
+            if (options){
+                printf("No options for this command\n");
+                continue;
+            }
+            else if (parameter && file_id==INVALID_ID){
+                printf("No such file\n");
+                continue;
+            }
+            else if (!parameter){
+                ls(working_dir_id);
+                continue;
+            }
+            ls(file_id);
+        }
+
+        else if (strcmp("cat", command) == 0){
+            // 1. Command check
+            if (parameter== NULL){
+                printf("usage: cat <file_name>\n");
+                continue;
+            } 
+            else if (options){
+                printf("No options for this command\n");
+                continue;
+            }
+            else if (file_id==INVALID_ID){
+                printf("No such file\n");
+                continue;
+            }
+            cat(file_id);
+        }
+
+        else if (strcmp("cd", command) == 0){
+            // 1. Command check
+            if (parameter== NULL){
+                printf("usage: cd <file_name>\n");
+                continue;
+            } 
+            else if (options){
+                printf("No options for this command\n");
+                continue;
+            }
+            else if (file_id==INVALID_ID){
+                printf("No such file\n");
+                continue;
+            }
+            cd(file_id);
+        }
+        
+        else if (strcmp("stat", command) == 0){
+            // 1. Command check
+            if (parameter== NULL){
+                printf("usage: stat <file_name>\n");
+                continue;
+            } 
+            else if (options){
+                printf("No options for this command\n");
+                continue;
+            }
+            else if (file_id==INVALID_ID){
+                printf("No such file\n");
+                continue;
+            }
+            stat(file_id);
+        }     
+
+        else if (strcmp("rm", command) == 0){
+            // 1. Command check
+            if (parameter== NULL){
+                printf("usage: rm <file_name>\n");
+                continue;
+            } 
+            else if (file_id==INVALID_ID){
+                printf("No such file\n");
+                continue;
+            }
+            rm(parent_id, file_id, file_name, options);
+        }
+        
+        // Type 2
+        else if (strcmp("mkdir", command) == 0){
+            // 1. Command check
             if (parameter== NULL){
                 printf("usage: mkdir <file_name>\n");
                 continue;
             } 
-            mkdir(parameter);
+            else if (options){
+                printf("No options for this command\n");
+                continue;
+            }
+            else if (file_id!=INVALID_ID){
+                printf("File exists!\n");
+                continue;
+            }
+            mkdir(parent_id, file_name);
         }
 
         else if (strcmp("touch", command) == 0){
+            // 1. Command check
             if (parameter== NULL){
                 printf("usage: touch <file_name>\n");
                 continue;
             } 
-            touch(parameter);
-        }
-        
-        else if (strcmp("ls", command) == 0){
-            ls(parameter);
-        }
-
-        else if (strcmp("cat", command) == 0){
-            if (parameter == NULL){
-                printf("usage: cat <file_name>\n");
+            else if (options){
+                printf("No options for this command\n");
                 continue;
             }
-            cat(parameter);
-        }
-
-        else if (strcmp("cd", command) == 0){
-            if (parameter == NULL){
-                printf("usage: cd <directory_name>\n");
+            else if (file_id!=INVALID_ID){
+                printf("File exists!\n");
                 continue;
             }
-            cd(parameter);
+            touch(parent_id, file_name);
         }
-        
-        else if (strcmp("rm", command) == 0){
-            if (parameter == NULL){
-                printf("usage: rm <file_name>\n");
-                continue;
-            }
-            rm(parameter, options);
-        }
-        
+        // Type 3
         else if (strcmp("exit", command) == 0){
             break;
+        }
+        else if (strcmp("pwd", command) == 0){
+            if (parameter){
+                printf("No parameter for this command\n");
+                continue;
+            } 
+            else if (options){
+                printf("No options for this command\n");
+                continue;
+            }
+            pwd();
         }
     }
     free(bmap);

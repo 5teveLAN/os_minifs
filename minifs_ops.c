@@ -20,6 +20,38 @@ extern VCB vcb;
 // We want to write the dentry to its directory!
 // its directory = 
 
+bool find_file_name_by_id(uint32_t dir_id, uint32_t file_id, char* file_name){
+    // 1. find file
+    uint32_t index = 0;
+    for (int i = 1; i < DENTRY_COUNT; ++i){
+        Dentry query_dir = fs_read_dentry(dir_id, i);
+        if (query_dir.file_id== file_id){
+            index=i;
+            break;
+        }
+    }
+    // impossible to be '0'(root dir)
+    if (!index) return false;
+    // 2. find dentry by index
+    Dentry temp_dentry = fs_read_dentry(dir_id, index);
+    // 3. copy string
+    strncpy(file_name, temp_dentry.file_name, 60);
+    return true;
+}
+/*
+uint32_t get_file_id(uint32_t dir_id, char* file_name){
+    Dentry dentry;
+    if (!get_file_dentry(dir_id, file_name, &dentry) return 0;
+    return dentry.file_id;
+}
+*/
+bool get_file_dentry(uint32_t dir_id, char* file_name, Dentry* dentry){
+    uint32_t index = find_file(dir_id, file_name);
+    if (!index) return false;
+    Dentry temp_dentry = fs_read_dentry(dir_id, index);
+    *dentry = temp_dentry;
+    return true;
+}
 uint32_t find_file(uint32_t dir_id, char* file_name){
     for (uint32_t index = 1; index < DENTRY_COUNT; ++index){
         Dentry query_dir = fs_read_dentry(dir_id, index);
