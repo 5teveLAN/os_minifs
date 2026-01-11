@@ -619,7 +619,7 @@ int main(int argc, char* argv[]){
         }
         if (!isatty(fileno(stdin))) {
 		    printf("%s", input_line); // 把自動輸入的指令秀出來
-	    }
+        }
         input_line[strcspn(input_line, "\n")] = 0;
         if (input_line[0]=='\0')
             continue;
