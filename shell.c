@@ -494,13 +494,13 @@ void update_current_path(){
     uint32_t dir_id = working_dir_id;
     uint32_t parent_dir_id;
     
-    // Prevent infinite loop with max depth
+    // 防止最大深度無限循環
     int max_depth = 100;
     while (max_depth-- > 0){
         if (!get_file_dentry(dir_id,"..", &parent_dentry)) break;
         parent_dir_id = parent_dentry.file_id;
         
-        // If parent is same as current (root case), break
+        // 如果父級與當前（根案例）相同，則中斷
         if (parent_dir_id == dir_id) break;
         
         find_file_name_by_id(parent_dir_id, dir_id, path_tok[cnt++]);
