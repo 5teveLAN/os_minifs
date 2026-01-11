@@ -5,17 +5,17 @@
 ### Create disk image
 
 - Linux:`./mkfs disk.img 102400`
-- Windows:`mkfs.exe disk.img 102400`
+- Windows:`./mkfs.exe disk.img 102400`
 
 ### Start Shell
 
 - Linux:`./shell disk.img`
-- Windows:`shell.exe disk.img`
+- Windows:`./shell.exe disk.img`
 
 Using autotest script:
 
 - Linux:`./shell disk.img < fulltest`
-- Windows:`shell.exe disk.img < fulltest`
+- Windows:`./shell.exe disk.img | fulltest`
 
 
 ### View content
