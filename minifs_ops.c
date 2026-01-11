@@ -77,7 +77,6 @@ void fs_write_dentry(uint32_t dir_id,Dentry *new_dentry){
             fseek(fp, offset, SEEK_SET);
             fwrite(&temp_dentry, sizeof(Dentry), 1, fp);
             fclose(fp);
-            printf("fount empty space for dentry! index: %d\n",index);
             return;
         }
 

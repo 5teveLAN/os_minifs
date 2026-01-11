@@ -1,28 +1,22 @@
 ### Compile
-1. Compile the header file 
-```bash
-gcc -c minifs_ops.c -o minifs_ops.o
-```
-2. Compile mkfs 
-```bash
-gcc mkfs.c minifs_ops.o -lws2_32 -o mkfs
-```
-3. Compile shell
-```bash
-gcc shell.c minifs_ops.o -lws2_32 -o shell
-```
+
+`make`
 
 ### Create disk image
-```bash
-./mkfs disk.img 102400
-```
+
+- Linux:`./mkfs disk.img 102400`
+- Windows:`mkfs.exe disk.img 102400`
 
 ### Start Shell
-`./shell disk.img`
+
+- Linux:`./shell disk.img`
+- Windows:`shell.exe disk.img`
 
 Using autotest script:
-Linux:
-`./shell disk.img < test_script`
+
+- Linux:`./shell disk.img < fulltest`
+- Windows:`shell.exe disk.img < fulltest`
+
 
 ### View content
 1. Start from 10240 byte
