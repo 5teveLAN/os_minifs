@@ -10,9 +10,6 @@
 #endif
 #include "minifs_ops.h"
 
-#define DBP_COUNT 4
-#define DENTRY_SIZE 64
-#define DENTRY_COUNT 64
 
 VCB vcb;
 const char* FILE_NAME;
@@ -21,7 +18,7 @@ uint8_t *bmap, *fmap;
 char current_path[256];
 
 static bool dir_is_empty(uint32_t dir_id){
-    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
+    for (uint32_t index = 0; index < vcb.dentry_count; ++index){
         Dentry dentry = fs_read_dentry(dir_id, index);
         if (dentry.file_id == 0 && dentry.file_name[0] == '\0'){
             continue;
@@ -40,7 +37,7 @@ static bool dir_is_empty(uint32_t dir_id){
 }
 
 static void rm_recursive(uint32_t dir_id){
-    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
+    for (uint32_t index = 0; index < vcb.dentry_count; ++index){
         Dentry dentry = fs_read_dentry(dir_id, index);
         if (dentry.file_id == 0 && dentry.file_name[0] == '\0'){
             continue;
@@ -54,7 +51,7 @@ static void rm_recursive(uint32_t dir_id){
             rm_recursive(sub_file_id);
         }
         // free block
-        for (int i = 0; i < DBP_COUNT; ++i){
+        for (int i = 0; i < vcb.dbp_count; ++i){
             bmap[sub_fcb.dbp[i]] = 0;
         }
         // free fmap
@@ -106,7 +103,7 @@ void rm(uint32_t parent_id, uint32_t file_id, char* file_name, char* options){
     uint32_t index = find_file(parent_id, file_name);
     fs_delete_dentry(parent_id, index);
     // free block
-    for (int i = 0; i < DBP_COUNT; ++i){
+    for (int i = 0; i < vcb.dbp_count; ++i){
         bmap[fcb.dbp[i]] = 0;
         bmap_save();
     }
@@ -120,7 +117,7 @@ uint32_t ls(uint32_t target_dir_id){
     printf("--------------------------------------------------------------------\n");
     
     uint32_t count = 0;
-    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
+    for (uint32_t index = 0; index < vcb.dentry_count; ++index){
         Dentry dentry = fs_read_dentry(target_dir_id, index);
         
         // Skip empty entries
@@ -272,7 +269,7 @@ void append_to_file(char* file_name, char* content)
 {
     // Find the file
     uint32_t file_id = 0;
-    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
+    for (uint32_t index = 0; index < vcb.dentry_count; ++index){
         Dentry dentry = fs_read_dentry(working_dir_id, index);
         if (strcmp(dentry.file_name, file_name) == 0){
             file_id = dentry.file_id;
@@ -332,7 +329,7 @@ void overwrite_file(char* file_name, char* content)
 {
     // Find the file
     uint32_t file_id = 0;
-    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
+    for (uint32_t index = 0; index < vcb.dentry_count; ++index){
         Dentry dentry = fs_read_dentry(working_dir_id, index);
         if (strcmp(dentry.file_name, file_name) == 0){
             file_id = dentry.file_id;

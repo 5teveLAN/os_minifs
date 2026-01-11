@@ -9,9 +9,6 @@
 #else
 #include <arpa/inet.h>//代表只要是 Linux 系統就包含這個頭檔
 #endif
-#define DBP_COUNT 4
-#define DENTRY_SIZE 64
-#define DENTRY_COUNT 64
 
 extern const char* FILE_NAME;
 extern uint8_t *bmap, *fmap;
@@ -23,7 +20,7 @@ extern VCB vcb;
 bool find_file_name_by_id(uint32_t dir_id, uint32_t file_id, char* file_name){
     // 1. find file
     uint32_t index = 0;
-    for (int i = 1; i < DENTRY_COUNT; ++i){
+    for (int i = 1; i < vcb.dentry_count; ++i){
         Dentry query_dir = fs_read_dentry(dir_id, i);
         if (query_dir.file_id== file_id){
             index=i;
@@ -53,7 +50,7 @@ bool get_file_dentry(uint32_t dir_id, char* file_name, Dentry* dentry){
     return true;
 }
 uint32_t find_file(uint32_t dir_id, char* file_name){
-    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
+    for (uint32_t index = 0; index < vcb.dentry_count; ++index){
         Dentry query_dir = fs_read_dentry(dir_id, index);
         if (strcmp(query_dir.file_name, file_name)==0) //no difference
             return index;
@@ -65,8 +62,8 @@ void fs_write_dentry(uint32_t dir_id,Dentry *new_dentry){
     Dentry temp_dentry = *new_dentry; //copy struct
     temp_dentry.file_id = htonl(new_dentry->file_id);
 
-    // for 0 ~ DENTRY_COUNT
-    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
+    // for 0 ~ vcb.dentry_count
+    for (uint32_t index = 0; index < vcb.dentry_count; ++index){
         Dentry query_dir = fs_read_dentry(dir_id, index);
         // empty space found
 
@@ -76,7 +73,7 @@ void fs_write_dentry(uint32_t dir_id,Dentry *new_dentry){
                 printf("Error: Cannot open file %s\n", FILE_NAME);
                 return;
             }
-            uint32_t offset = dir_dbp0*vcb.block_size + index*DENTRY_SIZE;
+            uint32_t offset = dir_dbp0*vcb.block_size + index*vcb.dentry_size;
             fseek(fp, offset, SEEK_SET);
             fwrite(&temp_dentry, sizeof(Dentry), 1, fp);
             fclose(fp);
@@ -107,7 +104,7 @@ void fs_delete_dentry(uint32_t dir_id, uint32_t index){
     
     FCB dir_fcb = fs_read_fcb(dir_id);
     uint32_t dir_dbp0 = dir_fcb.dbp[0];
-    uint32_t offset = dir_dbp0*vcb.block_size + index*DENTRY_SIZE;
+    uint32_t offset = dir_dbp0*vcb.block_size + index*vcb.dentry_size;
     Dentry temp_dentry;
 
     memset(&temp_dentry, 0, sizeof(Dentry));
@@ -127,7 +124,7 @@ Dentry fs_read_dentry(uint32_t dir_id, uint32_t index){
     }
     
     uint32_t dir_dbp0 = fs_read_fcb(dir_id).dbp[0];
-    fseek(fp, dir_dbp0*vcb.block_size  + index*DENTRY_SIZE, SEEK_SET);
+    fseek(fp, dir_dbp0*vcb.block_size  + index*vcb.dentry_size, SEEK_SET);
     fread(&dentry, sizeof(Dentry), 1, fp);
     fclose(fp);
     dentry.file_id = ntohl(dentry.file_id);  // 大端to host
@@ -183,7 +180,7 @@ void fs_write_fcb(uint32_t id,FCB *source_fcb){
     temp_fcb.is_dir    = htonl(source_fcb->is_dir);
     temp_fcb.file_size = htonl(source_fcb->file_size);  // 轉成大端
 
-    for (int i = 0; i < DBP_COUNT; ++i){
+    for (int i = 0; i < vcb.dbp_count; ++i){
         temp_fcb.dbp[i]      = htonl(source_fcb->dbp[i]);       // 轉成大端
     }
     fseek(fp, (vcb.fcb_start_block*vcb.block_size) + (id*vcb.fcb_size)
@@ -211,7 +208,7 @@ FCB fs_read_fcb(uint32_t id){
     fcb.is_dir = ntohl(fcb.is_dir);
     fcb.file_size = ntohl(fcb.file_size);  // 大端to host
 
-    for (int i = 0; i < DBP_COUNT; ++i){
+    for (int i = 0; i < vcb.dbp_count; ++i){
         fcb.dbp[i]      = ntohl(fcb.dbp[i]);       
     }
     
@@ -329,6 +326,9 @@ void vcb_load(){
     vcb.fcb_start_block  = fs_read_vcb_uint32(offset); offset += 4;
     vcb.fcb_end_block    = fs_read_vcb_uint32(offset); offset += 4;
     vcb.fcb_count        = fs_read_vcb_uint32(offset); offset += 4;
+    vcb.dbp_count        = fs_read_vcb_uint32(offset); offset += 4;
+    vcb.dentry_size      = fs_read_vcb_uint32(offset); offset += 4;
+    vcb.dentry_count     = fs_read_vcb_uint32(offset); offset += 4;
 }
 
 void vcb_save(){
@@ -343,6 +343,9 @@ void vcb_save(){
     fs_write_uint32(0, offset,vcb.fcb_start_block  ); offset += 4;
     fs_write_uint32(0, offset,vcb.fcb_end_block    ); offset += 4;
     fs_write_uint32(0, offset,vcb.fcb_count        ); offset += 4;
+    fs_write_uint32(0, offset,vcb.dbp_count        ); offset += 4;
+    fs_write_uint32(0, offset,vcb.dentry_size      ); offset += 4;
+    fs_write_uint32(0, offset,vcb.dentry_count     ); offset += 4;
 }
 
 // To use the following functions, you need to load vcb first.
@@ -395,7 +398,7 @@ void debug_dump(){
     FCB fcb = fs_read_fcb(10);
     printf("fcb%d.is_dir=%d\n", id, fcb.is_dir);
     printf("fcb%d.file_size=%d\n", id, fcb.file_size);
-    for (int i = 0; i < DBP_COUNT; ++i){
+    for (int i = 0; i < vcb.dbp_count; ++i){
         printf("fcb%d.dbp[%d]=%d\n", id, i,fcb.dbp[i]);
     }
 

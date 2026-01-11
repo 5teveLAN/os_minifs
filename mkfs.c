@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "minifs_ops.h"
-#define DBP_COUNT 4
 
 const char* FILE_NAME;
 uint32_t FILE_SIZE;
@@ -54,6 +53,9 @@ void mk_vcb() {
     vcb.fcb_end_block    = 9;
     vcb.fcb_count        = (vcb.fcb_end_block-vcb.fcb_start_block+1)
                            * (vcb.block_size/vcb.fcb_size);
+    vcb.dbp_count        = 4;
+    vcb.dentry_size      = 64;
+    vcb.dentry_count     = vcb.block_size * vcb.dbp_count / vcb.dentry_size;
     vcb_save();
 }
 // allocate memory to bmap and fmap
@@ -82,9 +84,9 @@ void mk_fcb(){
     for (int i = 0; i < vcb.fcb_count; ++i){
         fcb.is_dir = 0;
         fcb.file_size = 0;
-        for (int j = 0; j < DBP_COUNT; ++j)
+        for (int j = 0; j < vcb.dbp_count; ++j)
                         // data_start_block+0/1/2/3  + i *4
-            fcb.dbp[j] = (vcb.fcb_end_block+1) + j  + i*DBP_COUNT;
+            fcb.dbp[j] = (vcb.fcb_end_block+1) + j  + i*vcb.dbp_count;
         fs_write_fcb(i, &fcb);
     }
 

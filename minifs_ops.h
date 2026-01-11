@@ -22,6 +22,10 @@ typedef struct {
     uint32_t fcb_start_block;
     uint32_t fcb_end_block;
     uint32_t fcb_count;
+
+    uint32_t dbp_count;
+    uint32_t dentry_size;
+    uint32_t dentry_count;
 } VCB;
 
 typedef struct  {
