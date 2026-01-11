@@ -456,6 +456,8 @@ void resolve_path(char* path, uint32_t* parent_id, uint32_t* file_id, char* file
     }
 
     // Three condition:
+    // 0. Special condition: count = ntoken = 0 
+    //    -> Root
     // 1. Get parent, Get file (count = n_token)
     //    -> Found complete path, return (parent, file)
     // 2. Get parent, No  file (count = n_token -1)
@@ -463,7 +465,12 @@ void resolve_path(char* path, uint32_t* parent_id, uint32_t* file_id, char* file
     // 3. No  parent, No  file (other)
     //    -> Invalid path, return (INVALID, INVALID)
 
-    if (vaild_count == n_token){
+    if (!vaild_count && !n_token){
+        // Root file
+        *parent_id =INVALID_ID; 
+        *file_id = 0;
+    }
+    else if (vaild_count == n_token){
         // Found complete path
         *parent_id = temp_parent_id;
         *file_id = temp_file_id;
