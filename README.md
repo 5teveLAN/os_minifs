@@ -17,6 +17,13 @@ gcc shell.c minifs_ops.o -lws2_32 -o shell
 ./mkfs disk.img 102400
 ```
 
+### Start Shell
+`./shell disk.img`
+
+Using autotest script:
+Linux:
+`./shell disk.img < test_script`
+
 ### View content
 1. Start from 10240 byte
 ```bash
@@ -30,24 +37,4 @@ $bytes[10240..11263] | Format-Hex
 # Or simply view the entire file
 Format-Hex disk.img | more
 ```
-
-### FS Structure
-
-|              | Block 0<br>VCB   | Block 1<br>Bitmap | Block 2<br>FCB      | Block 3<br>... | Block 10<br>root   |     |
-| ------------ | ---------------- | ----------------- | ------------------- | -------------- | ------------------ | --- |
-| Offset 0     | block_size       |                   | isDir? (1byte)      |                | inode id           |     |
-| Offset 4     | block_count      |                   | file_size           |                | file name          |     |
-| Offset 8     | fcb_size         |                   | dbp1                |                |                    |     |
-| Offset 12    | bmap_start_block |                   | dbp2                |                |                    |     |
-| Offset 16    | bmap_end_block   |                   | dbp3                |                |                    |     |
-| Offset 20    | fmap_start_block |                   | dbp4                |                |                    |     |
-| Offset 24    | fmap_end_block   |                   |                     |                |                    |     |
-| Offset 28    | fcb_start_addr   |                   |                     |                |                    |     |
-| Offset 32    | fcb_end_block    |                   | (another FCB)<br>id |                |                    |     |
-| Offset<br>36 | fcb_count        |                   |                     |                |                    |     |
-| Offset 64    |                  |                   |                     |                | (another inode id) |     |
-
-
-
-
 
