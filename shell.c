@@ -5,11 +5,14 @@
 #include <string.h>
 #ifdef _WIN32
 #include <winsock2.h>//代表只要是 Windows 系統就包含這個頭檔
+#include <io.h>
+#define isatty _isatty
+#define fileno _fileno
 #else
 #include <arpa/inet.h>//代表只要是 Linux 系統就包含這個頭檔
+#include <unistd.h>
 #endif
 #include "minifs_ops.h"
-#include <unistd.h>
 
 #define DENTRY_COUNT 64
 
