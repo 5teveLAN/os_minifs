@@ -90,7 +90,6 @@ void mk_fcb(){
         fs_write_fcb(i, &fcb);
     }
 
-  
 }
 
 void mk_root(){
