@@ -1,0 +1,6 @@
+mkdir /data
+touch /data/file1
+ls /data
+cd /data
+pwd
+exit

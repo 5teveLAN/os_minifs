@@ -9,6 +9,7 @@
 #include <arpa/inet.h>//代表只要是 Linux 系統就包含這個頭檔
 #endif
 #include "minifs_ops.h"
+#include <unistd.h>
 
 
 VCB vcb;
@@ -566,7 +567,6 @@ int main(int argc, char* argv[]){
     }
 
     FILE_NAME = argv[1]; 
-    
     // Check if file exists and can be opened
     FILE *test_fp = fopen(FILE_NAME, "r+b");
     if (!test_fp) {
@@ -608,6 +608,9 @@ int main(int argc, char* argv[]){
             // Handle EOF (e.g., Ctrl+D)
             break;
         }
+        if (!isatty(fileno(stdin))) {
+		    printf("%s", input_line); // 把自動輸入的指令秀出來
+	    }
         input_line[strcspn(input_line, "\n")] = 0;
         if (input_line[0]=='\0')
             continue;
