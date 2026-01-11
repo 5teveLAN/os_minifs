@@ -1,13 +1,13 @@
-### Compile
+# Compile
 
 `make`
 
-### Create disk image
+## Create disk image
 
 - Linux:`./mkfs disk.img 102400`
 - Windows:`.\mkfs.exe disk.img 102400`
 
-### Start Shell
+## Start Shell
 
 - Linux:`./shell disk.img`
 - Windows:`.\shell.exe disk.img`
@@ -17,9 +17,10 @@ Using autotest script:
 - Linux:`./shell disk.img < fulltest`
 - Windows:`.\shell.exe disk.img | fulltest`
 
+## View content
 
-### View content
 1. Start from 10240 byte
+
 ```bash
 # Linux/Git Bash
 xxd -c 16 -g 4 -s 10240 disk.img | less
@@ -31,4 +32,3 @@ $bytes[10240..11263] | Format-Hex
 # Or simply view the entire file
 Format-Hex disk.img | more
 ```
-
