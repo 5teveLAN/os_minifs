@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define INVALID_ID 0xFFFFFFFF
+
 extern const char* FILE_NAME;
 extern uint8_t *bmap, *fmap;
 
@@ -53,6 +55,8 @@ void fs_write_fcb(uint32_t id,FCB *source_fcb);
 FCB fs_read_fcb(uint32_t id);
 
 uint32_t fs_read_uint32(uint32_t block, uint32_t offset);
+
+uint32_t fs_read_vcb_uint32(uint32_t offset);
 
 uint8_t fs_read_char(uint32_t block, uint32_t offset);
 

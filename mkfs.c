@@ -114,6 +114,10 @@ void mk_root(){
     
     Dentry itself = {0, "."}; //root fcb id = 0! name =  "."
     fs_write_dentry(0, &itself); // equals make a "." directory on root!
+    
+    // Add ".." entry that points to root itself (for proper navigation)
+    Dentry parent = {0, ".."};
+    fs_write_dentry(0, &parent);
 
 }
 

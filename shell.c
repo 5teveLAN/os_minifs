@@ -13,7 +13,6 @@
 #define DBP_COUNT 4
 #define DENTRY_SIZE 64
 #define DENTRY_COUNT 64
-#define INVALID_ID 0xFFFFFFFF
 
 VCB vcb;
 const char* FILE_NAME;
@@ -69,6 +68,19 @@ static void rm_recursive(uint32_t dir_id){
 
 void rm(uint32_t parent_id, uint32_t file_id, char* file_name, char* options){
     bool allow_dir = false , recursive = false;
+    
+    // Protection: Cannot delete root directory (ID 0)
+    if (file_id == 0) {
+        printf("Cannot remove root directory!\n");
+        return;
+    }
+    
+    // Protection: Cannot delete . or .. in root directory
+    if (parent_id == 0 && (strcmp(file_name, ".") == 0 || strcmp(file_name, "..") == 0)) {
+        printf("Cannot remove '%s' from root directory!\n", file_name);
+        return;
+    }
+    
     FCB fcb = fs_read_fcb(file_id);
     if (options && strchr(options, 'f'))
         allow_dir = true;
@@ -181,6 +193,7 @@ void mkdir(uint32_t parent_id, char* file_name){
     // add a dentry on current dir
 
     Dentry new_dentry; 
+    memset(&new_dentry, 0, sizeof(Dentry));
     new_dentry.file_id   = new_dir_id;
     strncpy(new_dentry.file_name, file_name, 60);
 
@@ -188,12 +201,14 @@ void mkdir(uint32_t parent_id, char* file_name){
 
     // 添加 "." 和 ".." 到新目錄 
     Dentry itself;
+    memset(&itself, 0, sizeof(Dentry));
     itself.file_id = new_dir_id;
     strncpy(itself.file_name, ".", 60);
     fs_write_dentry(new_dir_id, &itself);
     
     Dentry parent_dentry;
-    parent_dentry.file_id = working_dir_id;
+    memset(&parent_dentry, 0, sizeof(Dentry));
+    parent_dentry.file_id = parent_id; // Use parent_id instead of working_dir_id
     strncpy(parent_dentry.file_name, "..", 60);
     fs_write_dentry(new_dir_id, &parent_dentry);
     
@@ -244,6 +259,7 @@ void touch(uint32_t parent_id, char* file_name){
 
     // add a dentry on current dir
     Dentry new_dentry; 
+    memset(&new_dentry, 0, sizeof(Dentry));
     new_dentry.file_id   = new_file_id;
     strncpy(new_dentry.file_name, file_name, 60);
 
@@ -411,17 +427,24 @@ void cd(uint32_t dir_id){
 }
 
 void resolve_path(char* path, uint32_t* parent_id, uint32_t* file_id, char* file_name){
+    // Create a copy of the path to avoid modifying the original
+    char path_copy[256];
+    strncpy(path_copy, path, 255);
+    path_copy[255] = '\0';
+    
     char* path_tok[256] = {NULL};
-    char* next_tok = strtok(path, "/"); 
+    char* next_tok = strtok(path_copy, "/"); 
     uint32_t temp_parent_id =0, temp_file_id;
     int n_token = 0, vaild_count = 0;
     Dentry dentry;
 
     // 1. is absolute?
-    if (path[0]=='/')
+    if (path[0]=='/'){
         temp_file_id = 0;
-    else 
+    }
+    else {
         temp_file_id = working_dir_id;
+    }
 
     while (next_tok){
         path_tok[n_token++] = next_tok;
@@ -429,7 +452,7 @@ void resolve_path(char* path, uint32_t* parent_id, uint32_t* file_id, char* file
     }
 
     // 2. look forward
-    while(get_file_dentry(temp_file_id, path_tok[vaild_count], &dentry)){
+    while(vaild_count < n_token && get_file_dentry(temp_file_id, path_tok[vaild_count], &dentry)){
         temp_parent_id = temp_file_id;
         temp_file_id = dentry.file_id;
         vaild_count++;
@@ -437,23 +460,26 @@ void resolve_path(char* path, uint32_t* parent_id, uint32_t* file_id, char* file
 
     // Three condition:
     // 1. Get parent, Get file (count = n_token)
-    //    -> No this path, return (parent,    file)
+    //    -> Found complete path, return (parent, file)
     // 2. Get parent, No  file (count = n_token -1)
-    //    -> No this path, return (parent, INVALID)
+    //    -> File doesn't exist but parent found, return (parent, INVALID)
     // 3. No  parent, No  file (other)
-    //    -> No this path, return false
+    //    -> Invalid path, return (INVALID, INVALID)
 
     if (vaild_count == n_token){
+        // Found complete path
         *parent_id = temp_parent_id;
         *file_id = temp_file_id;
         strncpy(file_name , path_tok[n_token-1], 60); //last tok
     }
     else if (vaild_count == n_token -1){
-        *parent_id = temp_parent_id;
+        // File doesn't exist, but parent directory is valid
+        *parent_id = temp_file_id; // Use current directory as parent, not temp_parent_id
         *file_id = INVALID_ID;
         strncpy(file_name , path_tok[n_token-1], 60);
     }
     else {
+        // Invalid path
         *parent_id =INVALID_ID; 
         *file_id = INVALID_ID;
     }
@@ -467,20 +493,32 @@ void update_current_path(){
     Dentry parent_dentry;
     uint32_t dir_id = working_dir_id;
     uint32_t parent_dir_id;
-    while (true){
+    
+    // Prevent infinite loop with max depth
+    int max_depth = 100;
+    while (max_depth-- > 0){
         if (!get_file_dentry(dir_id,"..", &parent_dentry)) break;
         parent_dir_id = parent_dentry.file_id;
+        
+        // If parent is same as current (root case), break
+        if (parent_dir_id == dir_id) break;
+        
         find_file_name_by_id(parent_dir_id, dir_id, path_tok[cnt++]);
-        dir_id = parent_dentry.file_id;
+        dir_id = parent_dir_id;
+        
+        // Additional safety check
+        if (cnt >= 256) break;
     } 
     memset(current_path, 0, sizeof(current_path));
 
     if (cnt==0){ //in root
         strcat(current_path, "/");
     }
-    while (cnt>0){
-        strcat(current_path, "/");
-	    strcat(current_path, path_tok[--cnt]);
+    else {
+        for (int i = cnt - 1; i >= 0; i--){
+            strcat(current_path, "/");
+            strcat(current_path, path_tok[i]);
+        }
     }
 }
 
@@ -519,16 +557,43 @@ int main(int argc, char* argv[]){
 
     // check input
     if (argc!=2){
-        fprintf(stderr, "Usage: %s <FILE_NAME>.", argv[0]);
+        fprintf(stderr, "Usage: %s <FILE_NAME>.\n", argv[0]);
         return EXIT_FAILURE;
     }
 
     FILE_NAME = argv[1]; 
+    
+    // Check if file exists and can be opened
+    FILE *test_fp = fopen(FILE_NAME, "r+b");
+    if (!test_fp) {
+        fprintf(stderr, "Error: Cannot open file %s\n", FILE_NAME);
+        return EXIT_FAILURE;
+    }
+    fclose(test_fp);
+    
+    // Load VCB first
     vcb_load();
+    
+    // Allocate memory for bitmaps with error checking
     bmap = (uint8_t *)calloc(vcb.block_count, sizeof(uint8_t));
+    if (!bmap) {
+        fprintf(stderr, "Error: Failed to allocate memory for bmap\n");
+        return EXIT_FAILURE;
+    }
+    
     fmap = (uint8_t *)calloc(vcb.fcb_count, sizeof(uint8_t));
+    if (!fmap) {
+        fprintf(stderr, "Error: Failed to allocate memory for fmap\n");
+        free(bmap);
+        return EXIT_FAILURE;
+    }
+    
+    // Load bitmaps
     bmap_load();
     fmap_load();
+    
+    // Initialize working directory to root
+    working_dir_id = 0;
 
 
     while (1) {

@@ -47,19 +47,18 @@ uint32_t get_file_id(uint32_t dir_id, char* file_name){
 */
 bool get_file_dentry(uint32_t dir_id, char* file_name, Dentry* dentry){
     uint32_t index = find_file(dir_id, file_name);
-    if (!index) return false;
+    if (index == INVALID_ID) return false;
     Dentry temp_dentry = fs_read_dentry(dir_id, index);
     *dentry = temp_dentry;
     return true;
 }
 uint32_t find_file(uint32_t dir_id, char* file_name){
-    for (uint32_t index = 1; index < DENTRY_COUNT; ++index){
+    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
         Dentry query_dir = fs_read_dentry(dir_id, index);
         if (strcmp(query_dir.file_name, file_name)==0) //no difference
             return index;
-            // impossible to be '0'(root dir)
     }
-    return 0;
+    return INVALID_ID; // File not found
 }
 void fs_write_dentry(uint32_t dir_id,Dentry *new_dentry){
     uint32_t dir_dbp0 = fs_read_fcb(dir_id).dbp[0];
@@ -73,6 +72,10 @@ void fs_write_dentry(uint32_t dir_id,Dentry *new_dentry){
 
         if (query_dir.file_id == 0 && query_dir.file_name[0] == '\0'){
             FILE *fp = fopen(FILE_NAME, "r+b");
+            if (!fp) {
+                printf("Error: Cannot open file %s\n", FILE_NAME);
+                return;
+            }
             uint32_t offset = dir_dbp0*vcb.block_size + index*DENTRY_SIZE;
             fseek(fp, offset, SEEK_SET);
             fwrite(&temp_dentry, sizeof(Dentry), 1, fp);
@@ -97,7 +100,11 @@ void print_dentry(Dentry* dentry){
 
 void fs_delete_dentry(uint32_t dir_id, uint32_t index){
     FILE *fp = fopen(FILE_NAME, "r+b");
-    Dentry target_dentry = fs_read_dentry(dir_id, index);
+    if (!fp) {
+        printf("Error: Cannot open file %s\n", FILE_NAME);
+        return;
+    }
+    
     FCB dir_fcb = fs_read_fcb(dir_id);
     uint32_t dir_dbp0 = dir_fcb.dbp[0];
     uint32_t offset = dir_dbp0*vcb.block_size + index*DENTRY_SIZE;
@@ -111,8 +118,15 @@ void fs_delete_dentry(uint32_t dir_id, uint32_t index){
 
 Dentry fs_read_dentry(uint32_t dir_id, uint32_t index){
     FILE *fp = fopen(FILE_NAME, "r+b");
-    uint32_t dir_dbp0 = fs_read_fcb(dir_id).dbp[0];
     Dentry dentry;
+    memset(&dentry, 0, sizeof(Dentry)); // Initialize to zeros
+    
+    if (!fp) {
+        printf("Error: Cannot open file %s\n", FILE_NAME);
+        return dentry;
+    }
+    
+    uint32_t dir_dbp0 = fs_read_fcb(dir_id).dbp[0];
     fseek(fp, dir_dbp0*vcb.block_size  + index*DENTRY_SIZE, SEEK_SET);
     fread(&dentry, sizeof(Dentry), 1, fp);
     fclose(fp);
@@ -157,6 +171,11 @@ uint32_t bmap_new(){
 // write fcb data in big-endian 
 void fs_write_fcb(uint32_t id,FCB *source_fcb){
     FILE *fp = fopen(FILE_NAME, "r+b");
+    if (!fp) {
+        printf("Error: Cannot open file %s\n", FILE_NAME);
+        return;
+    }
+    
     // turn struct to big-endian
     FCB temp_fcb;
     memset(&temp_fcb, 0, sizeof(FCB));
@@ -176,7 +195,14 @@ void fs_write_fcb(uint32_t id,FCB *source_fcb){
 // read fcb data in big-endian 
 FCB fs_read_fcb(uint32_t id){
     FCB fcb;
+    memset(&fcb, 0, sizeof(FCB)); // Initialize to zeros
+    
     FILE *fp = fopen(FILE_NAME, "r+b");
+    if (!fp) {
+        printf("Error: Cannot open file %s\n", FILE_NAME);
+        return fcb;
+    }
+    
     fseek(fp, (vcb.fcb_start_block*vcb.block_size) + (id*vcb.fcb_size)
           , SEEK_SET);
     fread(&fcb, sizeof(FCB), 1, fp);
@@ -196,14 +222,23 @@ FCB fs_read_fcb(uint32_t id){
 // read 4 byte data in big-endian 
 uint32_t fs_read_uint32(uint32_t block, uint32_t offset){
     FILE *fp = fopen(FILE_NAME, "r+b");
-    uint32_t BLOCK_SIZE = 0;
+    if (!fp) {
+        printf("Error: Cannot open file %s\n", FILE_NAME);
+        return 0;
+    }
+    
+    uint32_t BLOCK_SIZE = vcb.block_size; // Use vcb instead of recursive call
     uint32_t data = 0x00;
-    if (block!=0)
-        BLOCK_SIZE = fs_read_uint32(0, 4); 
-
+    
     fseek(fp, block*BLOCK_SIZE+offset, SEEK_SET);
     for (int boffset = 24; boffset >= 0; boffset-=8){
-        data |= (uint32_t)fgetc(fp)<<boffset;//BUG IS HERE
+        int byte = fgetc(fp);
+        if (byte == EOF) {
+            printf("Error: Unexpected EOF in fs_read_uint32\n");
+            fclose(fp);
+            return 0;
+        }
+        data |= (uint32_t)byte << boffset;
     }
     fclose(fp);
     return data;
@@ -211,22 +246,33 @@ uint32_t fs_read_uint32(uint32_t block, uint32_t offset){
 // read 1 byte data (fgetc)
 uint8_t fs_read_char(uint32_t block, uint32_t offset){
     FILE *fp = fopen(FILE_NAME, "r+b");
-    uint32_t BLOCK_SIZE = 0;
-    uint32_t data = 0x00;
-    if (block!=0)
-        BLOCK_SIZE = fs_read_uint32(0, 4); 
-
+    if (!fp) {
+        printf("Error: Cannot open file %s\n", FILE_NAME);
+        return 0;
+    }
+    
+    uint32_t BLOCK_SIZE = vcb.block_size; // Use vcb instead of recursive call
+    
     fseek(fp, block*BLOCK_SIZE+offset, SEEK_SET);
-    data = fgetc(fp);
+    int data = fgetc(fp);
     fclose(fp);
-    return data;
+    
+    if (data == EOF) {
+        printf("Error: Unexpected EOF in fs_read_char\n");
+        return 0;
+    }
+    
+    return (uint8_t)data;
 }
 // write 4 byte data in big-endian 
 void fs_write_uint32(uint32_t block, uint32_t offset, uint32_t data){
     FILE *fp = fopen(FILE_NAME, "r+b");
-    uint32_t BLOCK_SIZE = 0;
-    if (block!=0)
-        BLOCK_SIZE = fs_read_uint32(0, 4); 
+    if (!fp) {
+        printf("Error: Cannot open file %s\n", FILE_NAME);
+        return;
+    }
+    
+    uint32_t BLOCK_SIZE = vcb.block_size; // Use vcb instead of recursive call
 
     fseek(fp, block*BLOCK_SIZE+offset, SEEK_SET);
     for (int boffset = 24; boffset >= 0; boffset-=8){
@@ -237,26 +283,52 @@ void fs_write_uint32(uint32_t block, uint32_t offset, uint32_t data){
 
 void fs_write_char(uint32_t block, uint32_t offset, char data){
     FILE *fp = fopen(FILE_NAME, "r+b");
-    uint32_t BLOCK_SIZE = 0;
-    if (block!=0)
-        BLOCK_SIZE = fs_read_uint32(0, 4); 
+    if (!fp) {
+        printf("Error: Cannot open file %s\n", FILE_NAME);
+        return;
+    }
+    
+    uint32_t BLOCK_SIZE = vcb.block_size; // Use vcb instead of recursive call
 
     fseek(fp, block*BLOCK_SIZE+offset, SEEK_SET);
     fputc(data, fp);
     fclose(fp);
 }
+// Special function to read VCB data directly without using vcb.block_size
+uint32_t fs_read_vcb_uint32(uint32_t offset){
+    FILE *fp = fopen(FILE_NAME, "r+b");
+    if (!fp) {
+        printf("Error: Cannot open file %s\n", FILE_NAME);
+        return 0;
+    }
+    
+    uint32_t data = 0x00;
+    fseek(fp, offset, SEEK_SET);
+    for (int boffset = 24; boffset >= 0; boffset-=8){
+        int byte = fgetc(fp);
+        if (byte == EOF) {
+            printf("Error: Unexpected EOF in fs_read_vcb_uint32\n");
+            fclose(fp);
+            return 0;
+        }
+        data |= (uint32_t)byte << boffset;
+    }
+    fclose(fp);
+    return data;
+}
+
 void vcb_load(){
     uint32_t offset = 0;
-    vcb.block_size       = fs_read_uint32(0, offset); offset += 4;
-    vcb.block_count      = fs_read_uint32(0, offset); offset += 4;
-    vcb.fcb_size         = fs_read_uint32(0, offset); offset += 4;
-    vcb.bmap_start_block = fs_read_uint32(0, offset); offset += 4;
-    vcb.bmap_end_block   = fs_read_uint32(0, offset); offset += 4;
-    vcb.fmap_start_block = fs_read_uint32(0, offset); offset += 4;
-    vcb.fmap_end_block   = fs_read_uint32(0, offset); offset += 4;
-    vcb.fcb_start_block   = fs_read_uint32(0, offset); offset += 4;
-    vcb.fcb_end_block    = fs_read_uint32(0, offset); offset += 4;
-    vcb.fcb_count      = fs_read_uint32(0, offset); offset += 4;
+    vcb.block_size       = fs_read_vcb_uint32(offset); offset += 4;
+    vcb.block_count      = fs_read_vcb_uint32(offset); offset += 4;
+    vcb.fcb_size         = fs_read_vcb_uint32(offset); offset += 4;
+    vcb.bmap_start_block = fs_read_vcb_uint32(offset); offset += 4;
+    vcb.bmap_end_block   = fs_read_vcb_uint32(offset); offset += 4;
+    vcb.fmap_start_block = fs_read_vcb_uint32(offset); offset += 4;
+    vcb.fmap_end_block   = fs_read_vcb_uint32(offset); offset += 4;
+    vcb.fcb_start_block  = fs_read_vcb_uint32(offset); offset += 4;
+    vcb.fcb_end_block    = fs_read_vcb_uint32(offset); offset += 4;
+    vcb.fcb_count        = fs_read_vcb_uint32(offset); offset += 4;
 }
 
 void vcb_save(){
