@@ -72,8 +72,8 @@ void rm(uint32_t parent_id, uint32_t file_id, char* file_name, char* options){
         return;
     }
     
-    // Protection: Cannot delete . or .. in root directory
-    if (parent_id == 0 && (strcmp(file_name, ".") == 0 || strcmp(file_name, "..") == 0)) {
+    // Protection: Cannot delete . in root directory (root has no .. entry)
+    if (parent_id == 0 && strcmp(file_name, ".") == 0) {
         printf("Cannot remove '%s' from root directory!\n", file_name);
         return;
     }
