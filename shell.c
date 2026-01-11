@@ -10,6 +10,7 @@
 #endif
 #include "minifs_ops.h"
 
+#define DENTRY_COUNT 64
 
 VCB vcb;
 const char* FILE_NAME;
@@ -265,51 +266,32 @@ void touch(uint32_t parent_id, char* file_name){
     return;
 }
 
-void append_to_file(char* file_name, char* content)
-{
-    // Find the file
-    uint32_t file_id = 0;
-    for (uint32_t index = 0; index < vcb.dentry_count; ++index){
-        Dentry dentry = fs_read_dentry(working_dir_id, index);
-        if (strcmp(dentry.file_name, file_name) == 0){
-            file_id = dentry.file_id;
-            break;
-        }
-    }
-    
-    if (file_id == 0){
-        printf("File %s not found!\n", file_name);
+// Append to file by file_id
+void append_to_file_by_id(uint32_t file_id, char* content, const char* display_name){
+    if (file_id == INVALID_ID || file_id == 0){
+        printf("Invalid file id\n");
         return;
     }
-    
-    // Read FCB
+
     FCB fcb = fs_read_fcb(file_id);
-    
-    // Check if it's a directory
     if (fcb.is_dir){
-        printf("%s is a directory!\n", file_name);
+        printf("%s is a directory!\n", display_name ? display_name : "<dir>");
         return;
     }
-    
-    // Calculate content length (add newline)
+
     uint32_t content_len = strlen(content);
-    //uint32_t new_size = fcb.file_size + content_len + 1; // +1 for newline
-    
-    // Write content to file
     uint32_t offset = fcb.file_size;
     for (uint32_t i = 0; i < content_len; i++){
         uint32_t block_index = offset / vcb.block_size;
         uint32_t block_offset = offset % vcb.block_size;
-        
         if (block_index >= 4){
             printf("File size exceeds maximum!\n");
             return;
         }
-        
         fs_write_char(fcb.dbp[block_index], block_offset, content[i]);
         offset++;
     }
-    
+
     // Add newline
     uint32_t block_index = offset / vcb.block_size;
     uint32_t block_offset = offset % vcb.block_size;
@@ -317,53 +299,60 @@ void append_to_file(char* file_name, char* content)
         fs_write_char(fcb.dbp[block_index], block_offset, '\n');
         offset++;
     }
-    
+
     // Update FCB
     fcb.file_size = offset;
     fs_write_fcb(file_id, &fcb);
-    
-    printf("Appended to %s\n", file_name);
+
+    if (display_name)
+        printf("Appended to %s\n", display_name);
+    else
+        printf("Appended to id=%u\n", file_id);
 }
 
-void overwrite_file(char* file_name, char* content)
-{
-    // Find the file
-    uint32_t file_id = 0;
-    for (uint32_t index = 0; index < vcb.dentry_count; ++index){
+// Backward-compatible wrapper: append by name in current working dir
+void append_to_file(char* file_name, char* content){
+    uint32_t file_id = INVALID_ID;
+    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
         Dentry dentry = fs_read_dentry(working_dir_id, index);
         if (strcmp(dentry.file_name, file_name) == 0){
             file_id = dentry.file_id;
             break;
         }
     }
-    
-    if (file_id == 0){
+    if (file_id == INVALID_ID || file_id == 0){
         printf("File %s not found!\n", file_name);
         return;
     }
-    
-    FCB fcb = fs_read_fcb(file_id);
-    if (fcb.is_dir){
-        printf("%s is a directory!\n", file_name);
+    append_to_file_by_id(file_id, content, file_name);
+}
+
+// Overwrite file by file_id
+void overwrite_file_by_id(uint32_t file_id, char* content, const char* display_name){
+    if (file_id == INVALID_ID || file_id == 0){
+        printf("Invalid file id\n");
         return;
     }
-    
-    // Write content to file starting at offset 0 (overwrite/truncate)
+
+    FCB fcb = fs_read_fcb(file_id);
+    if (fcb.is_dir){
+        printf("%s is a directory!\n", display_name ? display_name : "<dir>");
+        return;
+    }
+
     uint32_t content_len = strlen(content);
     uint32_t offset = 0;
     for (uint32_t i = 0; i < content_len; i++){
         uint32_t block_index = offset / vcb.block_size;
         uint32_t block_offset = offset % vcb.block_size;
-        
         if (block_index >= 4){
             printf("File size exceeds maximum!\n");
             return;
         }
-        
         fs_write_char(fcb.dbp[block_index], block_offset, content[i]);
         offset++;
     }
-    
+
     // Add newline
     uint32_t block_index = offset / vcb.block_size;
     uint32_t block_offset = offset % vcb.block_size;
@@ -371,14 +360,34 @@ void overwrite_file(char* file_name, char* content)
         fs_write_char(fcb.dbp[block_index], block_offset, '\n');
         offset++;
     }
-    
+
     // Update FCB
     fcb.file_size = offset;
     fs_write_fcb(file_id, &fcb);
-    
-    printf("Wrote to %s\n", file_name);
+
+    if (display_name)
+        printf("Wrote to %s\n", display_name);
+    else
+        printf("Wrote to id=%u\n", file_id);
 }
-void cat(uint32_t file_id){
+
+// Backward-compatible wrapper: overwrite by name in current working dir
+void overwrite_file(char* file_name, char* content)
+{
+    uint32_t file_id = INVALID_ID;
+    for (uint32_t index = 0; index < DENTRY_COUNT; ++index){
+        Dentry dentry = fs_read_dentry(working_dir_id, index);
+        if (strcmp(dentry.file_name, file_name) == 0){
+            file_id = dentry.file_id;
+            break;
+        }
+    }
+    if (file_id == INVALID_ID || file_id == 0){
+        printf("File %s not found!\n", file_name);
+        return;
+    }
+    overwrite_file_by_id(file_id, content, file_name);
+}void cat(uint32_t file_id){
     FCB fcb = fs_read_fcb(file_id);
     if (fcb.is_dir){
         printf("Is a directory!\n");
@@ -669,7 +678,30 @@ int main(int argc, char* argv[]){
                 continue;
             }
             
-            append_to_file(filename, content);
+            // Support full path - resolve and operate by file_id
+            {
+                char pathbuf[256];
+                strncpy(pathbuf, filename, 255);
+                pathbuf[255] = '\0';
+                uint32_t parent_id, file_id;
+                char base_name[60] = {0};
+                resolve_path(pathbuf, &parent_id, &file_id, base_name);
+                if (parent_id == INVALID_ID){
+                    printf("No such path!\n");
+                    continue;
+                }
+                if (file_id == INVALID_ID){
+                    // create file under parent
+                    touch(parent_id, base_name);
+                    Dentry d;
+                    if (!get_file_dentry(parent_id, base_name, &d)){
+                        printf("Failed to create file %s\n", base_name);
+                        continue;
+                    }
+                    file_id = d.file_id;
+                }
+                append_to_file_by_id(file_id, content, base_name);
+            }
             continue;
         }
 
@@ -718,13 +750,31 @@ int main(int argc, char* argv[]){
                 printf("usage: echo \"<content>\" > <file_name> or <content> > <file_name>\n");
                 continue;
             }
-            
-            // Create file if not exists
-            if (find_file(working_dir_id, filename) == INVALID_ID){
-                touch(working_dir_id, filename);
+
+            // Support full path - resolve and operate by file_id
+            {
+                char pathbuf[256];
+                strncpy(pathbuf, filename, 255);
+                pathbuf[255] = '\0';
+                uint32_t parent_id, file_id;
+                char base_name[60] = {0};
+                resolve_path(pathbuf, &parent_id, &file_id, base_name);
+                if (parent_id == INVALID_ID){
+                    printf("No such path!\n");
+                    continue;
+                }
+                if (file_id == INVALID_ID){
+                    // create file under parent
+                    touch(parent_id, base_name);
+                    Dentry d;
+                    if (!get_file_dentry(parent_id, base_name, &d)){
+                        printf("Failed to create file %s\n", base_name);
+                        continue;
+                    }
+                    file_id = d.file_id;
+                }
+                overwrite_file_by_id(file_id, content, base_name);
             }
-            
-            overwrite_file(filename, content);
             continue;
         }
 
