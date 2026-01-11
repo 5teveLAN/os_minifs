@@ -1,0 +1,50 @@
+# 1. 基本目錄操作
+mkdir /system
+mkdir /user
+ls /
+pwd
+
+# 2. 深度路徑測試 (測試 resolve_path 的遞迴能力)
+mkdir /user/documents
+mkdir /user/documents/lab
+cd /user/documents/lab
+pwd
+ls ..
+
+# 3. 檔案建立與狀態檢查
+touch /user/documents/notes.txt
+stat /user/documents/notes.txt
+ls /user/documents
+
+# 4. 內容寫入與覆蓋 (測試 > 運算子)
+echo "First line of data" > /user/documents/notes.txt
+cat /user/documents/notes.txt
+
+# 5. 內容追加 (測試 >> 運算子)
+echo "Second line appended" >> /user/documents/notes.txt
+cat /user/documents/notes.txt
+
+# 6. 覆蓋測試 (確認原本內容被清空)
+echo "Clean start" > /user/documents/notes.txt
+cat /user/documents/notes.txt
+
+# 7. 邊界測試：在不同目錄下建立同名檔案
+mkdir /system/bin
+touch /system/bin/notes.txt
+ls /system/bin
+ls /user/documents
+
+# 8. 刪除測試 (rm)
+# 先刪除單一檔案
+rm /system/bin/notes.txt
+ls /system/bin
+
+# 9. 遞迴刪除測試 (rm -rf)
+# 刪除包含內容的目錄
+rm -rf /user
+ls /
+
+# 10. 回到根目錄並最終檢查
+cd /
+ls
+exit

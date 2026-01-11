@@ -623,6 +623,8 @@ int main(int argc, char* argv[]){
         input_line[strcspn(input_line, "\n")] = 0;
         if (input_line[0]=='\0')
             continue;
+        if (input_line[0]=='#')
+            continue;
 
         /*
         If is a nomral command
