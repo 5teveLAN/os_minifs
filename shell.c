@@ -140,7 +140,7 @@ uint32_t ls(uint32_t target_dir_id){
     return count;
 }
 
-void mkdir(uint32_t parent_id, char* file_name){
+void fs_mkdir(uint32_t parent_id, char* file_name){
     // check if file name (not include '\0') > 59 
     if (strlen(file_name)>59){
         printf("exceeds the max len of file name: 60!\n");
@@ -824,8 +824,8 @@ int main(int argc, char* argv[]){
               (ls, cat, cd, rm, stat)
            pid = n, fid = n
 
-           Type 2. Create file/dir on parent path (mkdir, touch)
-              (mkdir, touch)
+           Type 2. Create file/dir on parent path (fs_mkdir, touch)
+              (fs_mkdir, touch)
            pid = n, fid = INVALID
 
            Type 3. No options, No parameters
@@ -923,7 +923,7 @@ int main(int argc, char* argv[]){
         else if (strcmp("mkdir", command) == 0){
             // 1. Command check
             if (parameter== NULL){
-                printf("usage: mkdir <file_name>\n");
+                printf("usage: fs_mkdir <file_name>\n");
                 continue;
             } 
             else if (options){
@@ -934,7 +934,7 @@ int main(int argc, char* argv[]){
                 printf("File exists!\n");
                 continue;
             }
-            mkdir(parent_id, file_name);
+            fs_mkdir(parent_id, file_name);
         }
 
         else if (strcmp("touch", command) == 0){
