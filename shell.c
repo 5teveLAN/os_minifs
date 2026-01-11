@@ -611,10 +611,18 @@ int main(int argc, char* argv[]){
         input_line[strcspn(input_line, "\n")] = 0;
         if (input_line[0]=='\0')
             continue;
+
         /*
-        If is append command
-         
-        // Check for append operation (>>)
+        If is a nomral command
+        */ 
+        command = NULL;
+        options = NULL;
+        parameter = NULL;
+        memset(path, 0, sizeof(path));
+
+        char* next_tok = NULL;
+        
+        // Check for append operation (>>) before normal command parsing
         char *append_op = strstr(input_line, ">>");
         if (append_op != NULL) //------------------------append----------------------
         {
@@ -712,24 +720,16 @@ int main(int argc, char* argv[]){
             }
             
             // Create file if not exists
-            if (!find_file(parent_id, filename)){
-                touch(parent_id, filename);
+            if (find_file(working_dir_id, filename) == INVALID_ID){
+                touch(working_dir_id, filename);
             }
             
             overwrite_file(filename, content);
             continue;
         }
-        */
 
-        /*
-        If is a nomral command
-        */ 
-        command = NULL;
-        options = NULL;
-        parameter = NULL;
-        memset(path, 0, sizeof(path));
-
-        char* next_tok = NULL;
+        // Normal command processing
+        // Normal command processing
         // 1. Get command
         command = strtok(input_line, " ");
         // 2. Get options array and path
